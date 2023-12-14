@@ -1,61 +1,41 @@
 import json
 import math
-import os
-from decimal import Decimal
 from itertools import product
 from math import sqrt
+from pathlib import Path
 from shutil import rmtree
-from string import ascii_uppercase
+from string import ascii_lowercase, ascii_uppercase
 from typing import Iterable
 
 import numpy as np
 import plotly.graph_objects as go
-from geniusweb.issuevalue.Bid import Bid
-from geniusweb.issuevalue.ValueSet import ValueSet
-from geniusweb.issuevalue.Domain import Domain
-from geniusweb.profile.utilityspace.LinearAdditiveUtilitySpace import (
-    LinearAdditiveUtilitySpace,
-)
 from numpy.random import Generator
 
 
 class UtilityFunction:
-    def __init__(self, profile, issue_weights, value_weights):
-        self.profile = profile
-        self.issue_weights = issue_weights
+    def __init__(self, objective_weights: dict, value_weights: dict[str, dict]):
+        self.objective_weights = objective_weights
         self.value_weights = value_weights
 
     @classmethod
-    def from_file(cls, utility_file):
-        utility_file = utility_file.split(":")[-1]
+    def from_file(cls, file: Path):
+        with open(file, "r") as f:
+            weights = json.load(f)
 
-        with open(utility_file, "r") as f:
-            profile = json.load(f)
+        objective_weights = weights["objective_weights"]
+        value_weights = weights["value_weights"]
 
-        raw = profile["LinearAdditiveUtilitySpace"]
-        issue_weights = {i: w for i, w in raw["issueWeights"].items()}
-        value_weights = {}
-
-        for issue, values in raw["issueUtilities"].items():
-            issue_value_weights = {
-                v: w for v, w in values["DiscreteValueSetUtilities"]["valueUtilities"].items()
-            }
-            value_weights[issue] = issue_value_weights
-
-        return cls(profile, issue_weights, value_weights)
+        return cls(objective_weights, value_weights)
 
     @classmethod
-    def create_random(cls, domain, name, np_random: Generator):
+    def create_random(cls, objectives: dict, np_random: Generator):
         def dirichlet_dist(names, mode, alpha=1):
-            distribution = (np_random.dirichlet([alpha] * len(names)) * 100000).astype(int)
-            if mode == "issues":
+            distribution = (np_random.dirichlet([alpha] * len(names)) * 100000).astype(
+                int
+            )
+            if mode == "objectives":
                 distribution[0] += 100000 - np.sum(distribution)
             if mode == "values":
-                # distribution = [100000] + [100000 * random() for _ in range(len(names) - 1)]
-                # shuffle(distribution)
-                # distribution = np.array(distribution).astype(int)
-                # distribution = (dirichlet(np.array(range(len(names))) * 0.3 + 1.0) * 100000).astype(int)
-                # shuffle(distribution)
                 distribution = distribution - np.min(distribution)
                 distribution = (distribution * 100000 / np.max(distribution)).astype(
                     int
@@ -63,49 +43,38 @@ class UtilityFunction:
             distribution = distribution / 100000
             return {i: w for i, w in zip(names, distribution)}
 
-        issues = list(domain["issuesValues"].keys())
-        issue_weights = dirichlet_dist(issues, "issues")
+        objective_weights = dirichlet_dist(list(objectives.keys()), "objectives")
         value_weights = {}
-        for issue in issues:
-            values = domain["issuesValues"][issue]["values"]
-            value_weights[issue] = dirichlet_dist(values, "values", alpha=1)
+        for objective, values in objectives.items():
+            value_weights[objective] = dirichlet_dist(values, "values")
 
-        issue_utilities = {
-            i: {"DiscreteValueSetUtilities": {"valueUtilities": value_weights[i]}} for i in issues
+        return cls(objective_weights, value_weights)
+
+    def to_file(self, file: Path):
+        weights = {
+            "objective_weights": self.objective_weights,
+            "value_weights": self.value_weights,
         }
-        profile = {
-            "LinearAdditiveUtilitySpace": {
-                "issueUtilities": issue_utilities,
-                "issueWeights": issue_weights,
-                "domain": domain,
-                "name": name,
-            }
-        }
-        return cls(profile, issue_weights, value_weights)
+        with open(file, "w") as f:
+            f.write(json.dumps(weights, indent=2))
 
-    def to_file(self, parent_path):
-        domain_name = self.profile["LinearAdditiveUtilitySpace"]["domain"]["name"]
-        profile_name = self.profile["LinearAdditiveUtilitySpace"]["name"]
-        path = os.path.join(parent_path, domain_name)
-        with open(os.path.join(path, f"{profile_name}.json"), "w") as f:
-            f.write(json.dumps(self.profile, indent=2))
-
-    def get_issues_values(self):
-        return self.profile["LinearAdditiveUtilitySpace"]["domain"]["issuesValues"]
-
-    def get_utility(self, bid: dict[str, str]):
+    def get_utility(self, bid: list):
         return sum(
-            self.issue_weights[i] * self.value_weights[i][v] for i, v in bid.items()
+            self.objective_weights[o] * self.value_weights[o][v] for o, v in enumerate(bid)
         )
+    
+    def get_max_utility_bid(self):
+        bid = []
+        for i in range(len(self.value_weights)):
+            isseu_value_weights = self.value_weights[i]
+            bid.append(min(isseu_value_weights, key=isseu_value_weights.get))
+        return bid
 
-
-class OutcomeSpace:
-    pass
 
 class Scenario:
     def __init__(
         self,
-        domain,
+        objectives: dict,
         utility_function_A: UtilityFunction,
         utility_function_B: UtilityFunction,
         SW_bid=None,
@@ -116,7 +85,7 @@ class Scenario:
         opposition=None,
         visualisation=None,
     ):
-        self.domain = domain
+        self.objectives = objectives
         self.utility_function_A = utility_function_A
         self.utility_function_B = utility_function_B
         self.SW_bid = SW_bid
@@ -128,53 +97,46 @@ class Scenario:
         self.visualisation = visualisation
 
     @classmethod
-    def create_random(cls, name, domain_size, np_random: Generator):
-        # def random_values(num_values):
-        #     values = [f"value_{x}" for x in ascii_uppercase[:num_values]]
-        #     return {"values": values}
-
-        if isinstance(domain_size, int):
-            domain_size = domain_size
-        elif isinstance(domain_size, list):
-            domain_size = np_random.integers(domain_size[0], domain_size[1])
+    def create_random(cls, size, np_random: Generator):
+        if isinstance(size, int):
+            size = size
+        elif isinstance(size, list):
+            size = np_random.integers(size[0], size[1])
         else:
-            raise ValueError("domain_size must be int or list")
+            raise ValueError("size must be int or list")
 
-        
-        # print(domain_size)
         while True:
-            num_issues = np_random.integers(3, 10)
-            spread = np_random.dirichlet([1] * num_issues)
-            multiplier = (domain_size / np.prod(spread)) ** (1.0 / num_issues)
-            values_per_issue = np.round(multiplier * spread).astype(np.int32)
-            values_per_issue = np.clip(values_per_issue, 2, None)
-            if abs(domain_size - np.prod(values_per_issue)) < (0.1 * domain_size):
+            num_objectives = np_random.integers(3, 10)
+            spread = np_random.dirichlet([1] * num_objectives)
+            multiplier = (size / np.prod(spread)) ** (1.0 / num_objectives)
+            values_per_objective = np.round(multiplier * spread).astype(np.int32)
+            values_per_objective = np.clip(values_per_objective, 2, None)
+            if abs(size - np.prod(values_per_objective)) < (0.1 * size):
                 break
-        issues = list(ascii_uppercase[:num_issues])
 
-        issuesValues = {}
-        for issue, num_values in zip(issues, values_per_issue):
-            values = {"values": [f"value{x}" for x in ascii_uppercase[:num_values]]}
-            issuesValues[f"issue{issue}"] = values
+        objectives = {i: [v for v in range(vs)] for i, vs in enumerate(values_per_objective)}
 
-        domain = {"name": name, "issuesValues": issuesValues}
-        utility_function_A = UtilityFunction.create_random(domain, "utility_function_A", np_random)
-        utility_function_B = UtilityFunction.create_random(domain, "utility_function_B", np_random)
-        return cls(domain, utility_function_A, utility_function_B)
+        utility_function_A = UtilityFunction.create_random(objectives, np_random)
+        utility_function_B = UtilityFunction.create_random(objectives, np_random)
+        return cls(objectives, utility_function_A, utility_function_B)
 
     @classmethod
-    def from_directory(cls, directory):
-        name = os.path.basename(directory)
-        utility_function_A = UtilityFunction.from_file(f"{directory}/utility_function_A.json")
-        utility_function_B = UtilityFunction.from_file(f"{directory}/utility_function_B.json")
-        domain = {"name": name, "issuesValues": utility_function_A.get_issues_values()}
+    def from_directory(cls, directory: Path):
+        utility_function_A = UtilityFunction.from_file(
+            directory / "utility_function_A.json"
+        )
+        utility_function_B = UtilityFunction.from_file(
+            directory / "utility_function_B.json"
+        )
+        with open(directory / "objectives.json", "r") as f:
+            objectives = json.load(f)
 
-        specials_path = f"{directory}/specials.json"
-        if os.path.exists(specials_path):
+        specials_path = directory / "specials.json"
+        if specials_path.exists():
             with open(specials_path, "r") as f:
                 specials = json.load(f)
             return cls(
-                domain,
+                objectives,
                 utility_function_A,
                 utility_function_B,
                 SW_bid=specials["social_welfare"],
@@ -185,8 +147,7 @@ class Scenario:
                 opposition=specials["opposition"],
             )
         else:
-            domain = cls(domain, utility_function_A, utility_function_B)
-            return domain
+            return cls(objectives, utility_function_A, utility_function_B)
 
     def calculate_specials(self):
         if self.nash_bid:
@@ -256,7 +217,19 @@ class Scenario:
                     y=[y],
                     mode="markers",
                     name="Nash",
-                    marker=dict(size=8, line_width=2, symbol="x-thin"),
+                    marker=dict(size=8, line_width=2, symbol="circle-open"),
+                )
+            )
+
+        if self.SW_bid:
+            x, y = self.SW_bid["utility"]
+            fig.add_trace(
+                go.Scatter(
+                    x=[x],
+                    y=[y],
+                    mode="markers",
+                    name="SW",
+                    marker=dict(size=8, line_width=2, symbol="square-open"),
                 )
             )
 
@@ -268,7 +241,7 @@ class Scenario:
                     y=[y],
                     mode="markers",
                     name="Kalai-Smorodinsky",
-                    marker=dict(size=8, line_width=2, symbol="cross-thin"),
+                    marker=dict(size=8, line_width=2, symbol="diamond-open"),
                 )
             )
 
@@ -277,7 +250,7 @@ class Scenario:
 
         fig.update_layout(
             title=dict(
-                text=f"{self.get_name()}<br><sub>(size: {len(list(self.iter_bids()))}, opposition: {self.opposition:.4f}, distribution: {self.distribution:.4f})</sub>",
+                text=f"<sub>(size: {len(list(self.iter_bids()))}, opposition: {self.opposition:.4f}, distribution: {self.distribution:.4f})</sub>",
                 x=0.5,
                 xanchor="center",
             )
@@ -285,19 +258,18 @@ class Scenario:
 
         self.visualisation = fig
 
-    def to_file(self, parent_path):
-        path = os.path.join(parent_path, self.domain["name"])
-        if os.path.exists(path):
-            rmtree(path)
-        os.makedirs(path)
+    def to_directory(self, directory: Path):
+        if directory.exists():
+            rmtree(directory)
+        directory.mkdir(parents=True)
 
-        with open(os.path.join(path, f"{self.domain['name']}.json"), "w") as f:
-            f.write(json.dumps(self.domain, indent=2))
-        self.utility_function_A.to_file(parent_path)
-        self.utility_function_B.to_file(parent_path)
+        with open(directory / "objectives.json", "w") as f:
+            f.write(json.dumps(self.objectives, indent=2))
+        self.utility_function_A.to_file(directory / "utility_function_A.json")
+        self.utility_function_B.to_file(directory / "utility_function_B.json")
 
         if self.nash_bid:
-            with open(os.path.join(path, "specials.json"), "w") as f:
+            with open(directory / "specials.json", "w") as f:
                 f.write(
                     json.dumps(
                         {
@@ -314,9 +286,7 @@ class Scenario:
                 )
 
         if self.visualisation:
-            self.visualisation.write_image(
-                file=os.path.join(path, "visualisation.pdf"), scale=5
-            )
+            self.visualisation.write_image(file=directory / "visualisation.pdf", scale=5)
 
     def iter_bids(self) -> Iterable:
         return iter(self)
@@ -363,11 +333,11 @@ class Scenario:
 
         return pareto_front
 
-    def get_distribution(self, bids_iter) -> float:        
-        min_distance_sum = .0
+    def get_distribution(self, bids_iter) -> float:
+        min_distance_sum = 0.0
 
         for i, bid in enumerate(bids_iter):
-            min_distance = self.distance_to_pareto(bid)            
+            min_distance = self.distance_to_pareto(bid)
             min_distance_sum += min_distance
 
         distribution = min_distance_sum / (i + 1)
@@ -394,7 +364,7 @@ class Scenario:
             distance = self.distance(pareto_bid, bid)
             if distance < min_distance:
                 min_distance = distance
-        
+
         return min_distance
 
     def distance(self, bid1, bid2=None):
@@ -417,20 +387,7 @@ class Scenario:
             raise ValueError("receive None bid")
         return math.sqrt(a + b)
 
-    def get_name(self):
-        return self.domain["name"]
-
     def __iter__(self) -> dict:
-        issuesValues = [
-            [i, v["values"]] for i, v in self.domain["issuesValues"].items()
-        ]
-        issues, values = zip(*issuesValues)
-
-        bids_values = product(*values)
+        bids_values = product(*self.objectives.values())
         for bid_values in bids_values:
-            yield {i: v for i, v in zip(issues, bid_values)}
-
-    def __str__(self) -> str:
-        return str(self.domain)
-
-
+            yield {i: v for i, v in zip(self.objectives.keys(), bid_values)}

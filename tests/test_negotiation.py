@@ -1,17 +1,16 @@
 import pytest
+
 from environment.negotiation import NegotiationEnv
 
 
 @pytest.fixture
 def env() -> NegotiationEnv:
     env_config = {
-        "agent_configs": [
-            {"class": "ANL2022.Agent007"},
-            {"class": "ANL2022.Agent4410"},
-        ],
+        "agent_configs": ["ANL2022.Agent007", "ANL2022.Agent4410"],
         "scenario": {"random"},
-        "deadline": {"rounds": 20, "ms": 60000},
+        "deadline": {"rounds": 20, "ms": 10000},
         "random_agent_order": True,
+        "offer_max_first": True,
     }
     env = NegotiationEnv(env_config)
     return env

@@ -5,3 +5,4 @@ torch_geometric
 pytest
 plotly
 scikit-learn
+kaleido

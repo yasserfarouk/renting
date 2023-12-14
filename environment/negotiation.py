@@ -1,74 +1,57 @@
+import time
+from collections import deque
 from itertools import cycle
+from pathlib import Path
+from string import ascii_lowercase, ascii_uppercase
+from typing import Union
+
 import numpy as np
-from gymnasium import spaces
+from gymnasium.spaces import Box, Dict, Discrete, MultiDiscrete
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
+
 from environment.agents.geniusweb import AGENTS
 from environment.scenario import Scenario
-from environment.deadline import Deadline
 
 
 class NegotiationEnv(MultiAgentEnv):
     def __init__(self, env_config: dict):
-        print(env_config)
         self.env_config = env_config
         self.agent_configs = env_config["agent_configs"]
         self._agent_ids = set([f"agent_{n}" for n in range(len(self.agent_configs))])
-
-        # self.action_space = spaces.Box(low=0, high=1, shape=(2,))
-        # self.observation_space = spaces.Box(low=0, high=1, shape=(6,))
-
-        # self._env = env
-        # self._num_players = len(self._env.observation_spec())
-        # self._ordered_agent_ids = [
-        #     PLAYER_STR_FORMAT.format(index=index) for index in range(self._num_players)
-        # ]
-        # # RLLib requires environments to have the following member variables:
-        # # observation_space, action_space, and _agent_ids
-        # self._agent_ids = set(self._ordered_agent_ids)
-
-        # # RLLib expects a dictionary of agent_id to observation or action,
-        # # Melting Pot uses a tuple, so we convert them here
-        # self.observation_space = self._convert_spaces_tuple_to_dict(
-        #     utils.spec_to_space(self._env.observation_spec()),
-        #     remove_world_observations=True,
-        # )
-        # self.action_space = self._convert_spaces_tuple_to_dict(
-        #     utils.spec_to_space(self._env.action_spec())
-        # )
         super().__init__()
 
     def reset(self, seed=None, options=None):
         # Call super's `reset()` method to (maybe) set the given `seed`.
         super().reset(seed=seed, options=options)
-        self.accept = None
 
         if "random" in self.env_config["scenario"]:
-            self.scenario = Scenario.create_random("random", [100, 10000], self.np_random)
+            self.scenario = Scenario.create_random([100, 10000], self.np_random)
         else:
-            self.scenario = Scenario(self.env_config["scenario"])
+            self.scenario = Scenario.from_directory(Path(self.env_config["scenario"]))
 
+        offer_action_space = MultiDiscrete([len(v) for v in self.scenario.objectives.values()], dtype=np.int32)
 
-        self.action_space = spaces.Dict(
+        self.action_space = Dict(
             {
-                "offer": self.scenario.action_space,
-                "accept": spaces.Discrete(2),
+                "offer": offer_action_space,
+                "accept": Discrete(2),
             }
         )
-        self.observation_space = spaces.Dict(
+        self.observation_space = Dict(
             {
-                "my_offer": self.scenario.action_space,
-                "opp_offer": self.scenario.action_space,
-                "time": spaces.Box(0.0, 1.0, dtype=np.float32),
+                "my_offer": offer_action_space,
+                "opp_offer": offer_action_space,
+                "time": Box(-0.1, 1.1, dtype=np.float32),
             }
         )
 
-        if self.env_config["random_agent_order"]:
-            self.np_random.shuffle(self.agent_configs)
+
+        self.last_actions = deque(maxlen=len(self._agent_ids))
 
         # TODO: list based utility functions in scenario
         utility_functions = [self.scenario.utility_function_A, self.scenario.utility_function_B]
-        for utility_function, agent_config in zip(utility_functions, self.agent_configs):
-            agent_config["utility_function"] = utility_function
+        # for utility_function, agent_config in zip(utility_functions, self.agent_configs):
+        #     agent_config["utility_function"] = utility_function
 
 
         if "rounds" in self.env_config["deadline"]:
@@ -79,261 +62,124 @@ class NegotiationEnv(MultiAgentEnv):
             raise ValueError("Deadline parameter not recognized")
 
         self.agents = []
-        for agent_id, agent_config in zip(self._agent_ids, self.agent_configs):
-            if "RL" in agent_config and agent_config["RL"]:
-                self.agents.append({"RL": None})
-                continue
-            elif "class" in agent_config:
-                agent_name = agent_config["class"]
-                agent_class = AGENTS[agent_config["class"]]
-            elif "random" in agent_config and agent_config["random"]:
-                agent_name, agent_class = self.np_random.choice(list(AGENTS.items()))
+        self.rl_agents = set()
+        for agent_id, agent_config, utility_function in zip(self._agent_ids, self.agent_configs, utility_functions):
+            if agent_config == "RL":
+                self.rl_agents.add(agent_id)
+                agent = None
+            elif agent_config == "random":
+                agent_class = self.np_random.choice(list(AGENTS.values()))
+                agent = agent_class(agent_id, utility_function, self.deadline)
+            elif agent_config in AGENTS:
+                agent_class = AGENTS[agent_config]
+                agent = agent_class(agent_id, utility_function, self.deadline)
             else:
                 raise ValueError("Agent config not recognized")
-            agent_name = agent_name.replace(".", "_")
-            agent = agent_class(agent_name, agent_config["utility_function"], self.deadline)
-            self.agents.append({agent_id: agent})
 
-        self.agents_iter = cycle(self.agents.items())
-        obs, _, _, _, infos = self.negotiate(None)
+            self.agents.append((agent_id, agent, utility_function))
 
-        # obs = {name: np.zeros(0) for name in self._agent_ids}
-        # infos = {}
+        if self.env_config["random_agent_order"]:
+            self.np_random.shuffle(self.agents)
+
+        self.agents_iter = cycle(self.agents)
+        
+        obs, _, _, _, infos = self.step(None)
 
         return obs, infos
-    
-    def increment_agent_index(self):
-        self.agent_index = (self.agent_index + 1) % len(self.agents)
 
-    def negotiate(self, action):
-        while not self.deadline.reached() and not self.accept:
-            agent_id, agent = next(self.agents_iter)
-
-            # self.agent_index = (self.agent_index + 1) % len(self.agents)
-            
-            if agent_id == "RL" :
-                obs = action
-                obs, rew = 0, 0
-                return obs, rew, {"__all__": False}, {"__all__": False}, {}
-            else:
-                action = agent.select_action()
-
-
-            if accept:
-                pass
-            self.check_action = action
-            self.action_count += 1
-
-            # if isinstance(agent, RLAgent):
-            #     obs = agent.generate_observation()
-            #     obs = {agent.name: obs}
-            #     return obs, {}#info
-            # else:
-
-            [agent.communicate_action(action) for agent in self.agents]
-            self.agent_index = (self.agent_index + 1) % len(self.agents)
-
-            if isinstance(action, Accept):
-                self.accept = action
-                break
-
-            # self.agent_index = (self.agent_index + 1) % len(self.agents)
-
-            # next_agent = self.agents[self.agent_index]
-            # if isinstance(next_agent, RLAgent):
-            #     obs = next_agent.generate_observation()
-            #     obs = {next_agent.name: obs}
-            #     rew = {next_agent.name: np.array(0, dtype=np.float32)}
-            #     return obs, rew, {"__all__": False}, {"__all__": False}, {}
-
-        if self.accept:
-            rew = {
-                agent.name: np.float32(agent.profile.getUtility(self.accept._bid))
-                for agent in self.agents
-            }
-            social_welfare = sum(rew.values())
-            rew = {name: reward * social_welfare for name, reward in rew.items()}
-            agreements = Agreements(
-                {agent.ID: self.accept._bid for agent in self.agents}
-            )
-        else:
-            rew = {agent.name: np.float32(0) for agent in self.agents}
-            agreements = Agreements({})
-
-        obs = {
-            agent.name: agent.generate_observation()
-            for agent in self.agents
-            if isinstance(agent, RLAgent)
-        }
-        [agent.finish(agreements) for agent in self.agents]
-
-        self.postprocessed = True
-
-        # TODO: write finalizing episode code
-        return obs, rew, {"__all__": True}, {"__all__": True}, {}
-        # return observation, reward, terminated, truncated, info
 
     def step(self, action_dict):
-        current_agent_name = self.agents[self.agent_index].name
-        if current_agent_name not in action_dict:
-            raise ValueError(f"{current_agent_name} not in {action_dict}")
-        # assert current_agent_name in rl_action
-        return self.negotiate(action_dict[current_agent_name])
+        if action_dict:
+            if self.current_agent_id not in action_dict:
+                raise ValueError(f"{self.current_agent_id} not in {action_dict}")
+            action = action_dict[self.current_agent_id]
+            action["agent_id"] = self.current_agent_id
+            self.last_actions.append(action)
+
+        while not self.deadline.reached() and (len(self.last_actions) < 1 or not self.last_actions[-1]["accept"]):
+            
+            self.current_agent_id, agent, utility_function = next(self.agents_iter)
+            
+            if self.current_agent_id in self.rl_agents:
+                if self.env_config["offer_max_first"] and len(self.last_actions) < 2:
+                    offer = np.array(utility_function.get_max_utility_bid(), dtype=np.int32)
+                    action = {"agent_id": self.current_agent_id, "offer": offer, "accept": 0}
+                else:
+                    obs = self.get_observation(self.current_agent_id, self.last_actions)
+                    rews = {self.current_agent_id: 0}
+                    return obs, rews, {"__all__": False}, {"__all__": False}, {}
+            else:
+                action: dict = agent.select_action(self.last_actions)
+
+            self.last_actions.append(action)
+
+
+        if self.last_actions[-1]["accept"]:
+            # NOTE: disabled the following assert because of rl actions
+            # assert self.last_actions[-1]["offer"] == self.last_actions[-2]["offer"]
+            rew = {
+                agent_id: np.float32(utility_function.get_utility(self.last_actions[-1]["offer"]))
+                for agent_id, _, utility_function in self.agents
+            }
+        else:
+            rew = {agent_id: np.float32(0) for agent_id, _, _ in self.agents}
+
+        [agent.final(self.last_actions) for _, agent, _ in self.agents if agent]
+
+
+        # TODO: write finalizing episode code
+        return {}, rew, {"__all__": True}, {"__all__": True}, {}
+        # return observation, reward, terminated, truncated, info
 
     # def step(self, action_dict):
-    #     observations, rewards, terminated, truncated, info = {}, {}, {}, {}, {}
-    #     return observations, rewards, terminated, truncated, info
+    #     if self.current_agent_id not in action_dict:
+    #         raise ValueError(f"{self.current_agent_id} not in {action_dict}")
+    #     action = action_dict[self.current_agent_id]
+    #     action["agent_id"] = self.current_agent_id
+    #     self.last_actions.append(action)
+    #     self.negotiate()
+
+    def get_observation(self, agent_id, last_actions):
+        #TODO: construct proper observation
+        obs = {
+            "my_offer": last_actions[0]["offer"],
+            "opp_offer": last_actions[1]["offer"],
+            "time": np.array([self.deadline.get_progress()], dtype=np.float32)
+        }
+        return {agent_id: obs}
 
 
+class BidHistory:
+    def __init__(self) -> None:
+        self.test = None
 
-# class NegotiationEnvOld(MultiAgentEnv):
-#     """Custom Environment that follows gym interface"""
 
-#     metadata = {"render.modes": ["human"]}
+class Deadline:
+    #TODO: fix infinite deadline, currently it is > 1 year
+    def __init__(self, ms: int=2**35, rounds: int = None):
+        assert ms or rounds
+        if ms and ms <= 0:
+            raise ValueError(f"ms must be positive but is {ms}")
+        if rounds and rounds <= 2:
+            raise ValueError(f"rounds must be at least 3 but is {rounds}")
 
-#     def __init__(self, env_config: dict):
-#         super().__init__()
-#         self.num_rl_opponents = env_config["num_rl_opponents"]
+        self.start_time_ms = time.time() * 1000
+        self.ms = ms
+        self.rounds = rounds
+        self.round = 0
 
-#         self.available_agents = AGENTS.copy()
+    def get_progress(self) -> Union[float, int]:
+        if self.rounds:
+            progress = self.round / self.rounds
+        else:
+            progress = (time.time() * 1000 - self.start_time_ms) / self.ms
+        
+        # clip progress to [0, 1]
+        return min(max(progress, 0), 1)
 
-#         rl_agents = {f"RLAgent_{i}": RLAgent for i in range(self.num_rl_opponents)}
-#         self.available_agents.update(rl_agents)
+    def reached(self) -> bool:
+        return True if self.get_progress() == 1 else False
 
-#         self.deadline_ms = env_config["deadline_ms"]
+    def advance_round(self):
+        self.round += 1
 
-#         if "domain_size" in env_config:
-#             self.fixed_domain_size = env_config["domain_size"]
-#         else:
-#             self.fixed_domain_size = None
-
-#         self.action_space = Dict(
-#             {
-#                 "util_goal": Box(0.0, 1.0, dtype=np.float32),
-#                 # "opp_util_goal": Box(0.0, 1.0, dtype=np.float32),
-#                 "accept": Discrete(2),
-#             }
-#         )
-#         self.observation_space = Box(0.0, 1.0, shape=(5,), dtype=np.float32)
-
-#         self._agent_ids = set(["RLAgent"] + [f"RLAgent_{i}" for i in range(self.num_rl_opponents)])
-
-#     def reset(self, seed=0, options=None) -> dict:
-#         self.agent_index = 0
-#         self.action_count = 0
-#         self.accept = None
-#         self.postprocessed = False
-#         self.check_action = None
-#         # self.agreement = Agreements({})
-
-#         if not self.fixed_domain_size:
-#             domain_size = self.np_random.randint(200, 2000)
-#         else:
-#             domain_size = self.fixed_domain_size
-
-#         self.scenario = Scenario.create_random("scenario", domain_size)
-
-#         agent_B_name, agent_B_class = self.np_random.choice(list(self.available_agents.items()))
-#         agent_B_name = agent_B_name.replace(".", "_")  # TODO: make sure a . works
-
-#         # TODO: this does not work, wrapped by default for now
-#         # if isinstance(agent_B_class, DefaultParty):
-#         #     agent_B_class = geniusweb_wrapper(agent_B_class)
-
-#         self.deadline = Deadline(self.deadline_ms)
-
-#         self.agents = [
-#             geniusweb_wrapper(RLAgent)(
-#                 "RLAgent", self.scenario.preferences_A, self.deadline
-#             ),
-#             geniusweb_wrapper(agent_B_class)(
-#                 agent_B_name, self.scenario.preferences_B, self.deadline
-#             ),
-#         ]
-
-#         self.np_random.shuffle(self.agents)#TODO: fix
-#         # self.agents = self.agents[::-1]
-
-#         obs, _, _, _, infos = self.negotiate()
-
-#         return obs, infos
-
-#     def increment_agent_index(self):
-#         self.agent_index = (self.agent_index + 1) % len(self.agents)
-
-#     def negotiate(self, rl_action=None):
-#         self.current_rl_action = rl_action
-#         while not self.deadline.reached() and not self.accept:
-#             agent = self.agents[self.agent_index]
-
-#             # self.agent_index = (self.agent_index + 1) % len(self.agents)
-            
-#             if isinstance(agent, RLAgent) and not self.current_rl_action:
-#                 obs = agent.generate_observation()
-#                 obs = {agent.name: obs}
-#                 rew = {agent.name: np.array(0, dtype=np.float32)}
-#                 return obs, rew, {"__all__": False}, {"__all__": False}, {}
-#             elif isinstance(agent, RLAgent) and self.current_rl_action:
-#                 action = agent.translate_action(self.current_rl_action)
-#                 self.current_rl_action = None
-#             else:
-#                 action = agent.select_action()
-
-#             self.check_action = action
-#             self.action_count += 1
-
-#             # if isinstance(agent, RLAgent):
-#             #     obs = agent.generate_observation()
-#             #     obs = {agent.name: obs}
-#             #     return obs, {}#info
-#             # else:
-
-#             [agent.communicate_action(action) for agent in self.agents]
-#             self.agent_index = (self.agent_index + 1) % len(self.agents)
-
-#             if isinstance(action, Accept):
-#                 self.accept = action
-#                 break
-
-#             # self.agent_index = (self.agent_index + 1) % len(self.agents)
-
-#             # next_agent = self.agents[self.agent_index]
-#             # if isinstance(next_agent, RLAgent):
-#             #     obs = next_agent.generate_observation()
-#             #     obs = {next_agent.name: obs}
-#             #     rew = {next_agent.name: np.array(0, dtype=np.float32)}
-#             #     return obs, rew, {"__all__": False}, {"__all__": False}, {}
-
-#         if self.accept:
-#             rew = {
-#                 agent.name: np.float32(agent.profile.getUtility(self.accept._bid))
-#                 for agent in self.agents
-#             }
-#             social_welfare = sum(rew.values())
-#             rew = {name: reward * social_welfare for name, reward in rew.items()}
-#             agreements = Agreements(
-#                 {agent.ID: self.accept._bid for agent in self.agents}
-#             )
-#         else:
-#             rew = {agent.name: np.float32(0) for agent in self.agents}
-#             agreements = Agreements({})
-
-#         obs = {
-#             agent.name: agent.generate_observation()
-#             for agent in self.agents
-#             if isinstance(agent, RLAgent)
-#         }
-#         [agent.finish(agreements) for agent in self.agents]
-
-#         self.postprocessed = True
-
-#         # TODO: write finalizing episode code
-#         return obs, rew, {"__all__": True}, {"__all__": True}, {}
-#         # return obs, rew, done, truncated, info
-
-#     def step(self, rl_action):
-#         current_agent_name = self.agents[self.agent_index].name
-#         if current_agent_name not in rl_action:
-#             raise ValueError(f"{current_agent_name} not in {rl_action}")
-#         # assert current_agent_name in rl_action
-#         return self.negotiate(rl_action[current_agent_name])
