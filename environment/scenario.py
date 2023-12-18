@@ -4,12 +4,12 @@ from itertools import product
 from math import sqrt
 from pathlib import Path
 from shutil import rmtree
-from string import ascii_lowercase, ascii_uppercase
 from typing import Iterable
 
 import numpy as np
 import plotly.graph_objects as go
 from numpy.random import Generator
+from numpy.random import default_rng
 
 
 class UtilityFunction:
@@ -20,7 +20,10 @@ class UtilityFunction:
     @classmethod
     def from_file(cls, file: Path):
         with open(file, "r") as f:
+            #TODO: this is ugly, maybe move to a vector based solution
             weights = json.load(f)
+            weights["objective_weights"] = {int(k): v for k, v in weights["objective_weights"].items()}
+            weights["value_weights"] = {int(k1): {int(k2): v2 for k2, v2 in v1.items()} for k1, v1 in weights["value_weights"].items()}
 
         objective_weights = weights["objective_weights"]
         value_weights = weights["value_weights"]
@@ -58,16 +61,16 @@ class UtilityFunction:
         with open(file, "w") as f:
             f.write(json.dumps(weights, indent=2))
 
-    def get_utility(self, bid: list):
+    def get_utility(self, bid: list | tuple):
         return sum(
             self.objective_weights[o] * self.value_weights[o][v] for o, v in enumerate(bid)
         )
     
     def get_max_utility_bid(self):
-        bid = []
-        for i in range(len(self.value_weights)):
-            isseu_value_weights = self.value_weights[i]
-            bid.append(min(isseu_value_weights, key=isseu_value_weights.get))
+        bid = [max(vw, key=vw.get) for vw in self.value_weights.values()]
+        # for i in range(len(self.value_weights)):
+        #     isseu_value_weights = self.value_weights[i]
+        #     bid.append(max(isseu_value_weights, key=isseu_value_weights.get))
         return bid
 
 
@@ -121,33 +124,38 @@ class Scenario:
         return cls(objectives, utility_function_A, utility_function_B)
 
     @classmethod
-    def from_directory(cls, directory: Path):
-        utility_function_A = UtilityFunction.from_file(
-            directory / "utility_function_A.json"
-        )
-        utility_function_B = UtilityFunction.from_file(
-            directory / "utility_function_B.json"
-        )
+    def from_directory(cls, directory: Path, np_random=default_rng()):
         with open(directory / "objectives.json", "r") as f:
-            objectives = json.load(f)
+            objectives = {int(k): v for k, v in json.load(f).items()}
 
-        specials_path = directory / "specials.json"
-        if specials_path.exists():
-            with open(specials_path, "r") as f:
-                specials = json.load(f)
-            return cls(
-                objectives,
-                utility_function_A,
-                utility_function_B,
-                SW_bid=specials["social_welfare"],
-                nash_bid=specials["nash"],
-                kalai_bid=specials["kalai"],
-                pareto_front=specials["pareto_front"],
-                distribution=specials["distribution"],
-                opposition=specials["opposition"],
+        if (directory / "utility_function_A.json").exists():
+            utility_function_A = UtilityFunction.from_file(
+                directory / "utility_function_A.json"
             )
+            utility_function_B = UtilityFunction.from_file(
+                directory / "utility_function_B.json"
+            )
+            specials_path = directory / "specials.json"
+            if specials_path.exists():
+                with open(specials_path, "r") as f:
+                    specials = json.load(f)
+                return cls(
+                    objectives,
+                    utility_function_A,
+                    utility_function_B,
+                    SW_bid=specials["social_welfare"],
+                    nash_bid=specials["nash"],
+                    kalai_bid=specials["kalai"],
+                    pareto_front=specials["pareto_front"],
+                    distribution=specials["distribution"],
+                    opposition=specials["opposition"],
+                )
         else:
-            return cls(objectives, utility_function_A, utility_function_B)
+            utility_function_A = UtilityFunction.create_random(objectives, np_random)
+            utility_function_B = UtilityFunction.create_random(objectives, np_random)
+
+
+        return cls(objectives, utility_function_A, utility_function_B)
 
     def calculate_specials(self):
         if self.nash_bid:
@@ -387,7 +395,7 @@ class Scenario:
             raise ValueError("receive None bid")
         return math.sqrt(a + b)
 
-    def __iter__(self) -> dict:
+    def __iter__(self) -> tuple:
         bids_values = product(*self.objectives.values())
         for bid_values in bids_values:
-            yield {i: v for i, v in zip(self.objectives.keys(), bid_values)}
+            yield bid_values #{i: v for i, v in zip(self.objectives.keys(), bid_values)}

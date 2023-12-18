@@ -1,9 +1,8 @@
 import time
+# import wandb
 from collections import deque
 from itertools import cycle
 from pathlib import Path
-from string import ascii_lowercase, ascii_uppercase
-from typing import Union
 
 import numpy as np
 from gymnasium.spaces import Box, Dict, Discrete, MultiDiscrete
@@ -20,16 +19,24 @@ class NegotiationEnv(MultiAgentEnv):
         self._agent_ids = set([f"agent_{n}" for n in range(len(self.agent_configs))])
         super().__init__()
 
+        # if env_config["wandb_enabled"]:
+        #     # self.wandb = setup_wandb(env_config["wandb_config"])
+        #     wandb.init(
+        #         project=env_config["wandb_config"]["project"],
+        #         group=env_config["wandb_config"]["group"],
+        #     )
+
     def reset(self, seed=None, options=None):
         # Call super's `reset()` method to (maybe) set the given `seed`.
         super().reset(seed=seed, options=options)
 
-        if "random" in self.env_config["scenario"]:
+        if self.env_config["scenario"] == "random":
             self.scenario = Scenario.create_random([100, 10000], self.np_random)
         else:
             self.scenario = Scenario.from_directory(Path(self.env_config["scenario"]))
 
         offer_action_space = MultiDiscrete([len(v) for v in self.scenario.objectives.values()], dtype=np.int32)
+        # self.action_offset = np.cumsum(np.insert(offer_action_space, 0, 0)[:-1])
 
         self.action_space = Dict(
             {
@@ -118,7 +125,7 @@ class NegotiationEnv(MultiAgentEnv):
             # NOTE: disabled the following assert because of rl actions
             # assert self.last_actions[-1]["offer"] == self.last_actions[-2]["offer"]
             rew = {
-                agent_id: np.float32(utility_function.get_utility(self.last_actions[-1]["offer"]))
+                agent_id: np.float32(utility_function.get_utility(self.last_actions[0]["offer"]))
                 for agent_id, _, utility_function in self.agents
             }
         else:
@@ -126,9 +133,15 @@ class NegotiationEnv(MultiAgentEnv):
 
         [agent.final(self.last_actions) for _, agent, _ in self.agents if agent]
 
+        opponent_utility = {type(agent).__name__: rew[agent_id] for agent_id, agent, _ in self.agents if agent}
+        # if self.env_config["wandb_enabled"]:
+        #     [wandb.log({type(agent).__name__: rew[agent_id]}) for agent_id, agent, _ in self.agents if agent]
+
+
+        infos = {"__common__": {"opponent_utility": opponent_utility}}
 
         # TODO: write finalizing episode code
-        return {}, rew, {"__all__": True}, {"__all__": True}, {}
+        return {}, rew, {"__all__": True}, {"__all__": True}, infos
         # return observation, reward, terminated, truncated, info
 
     # def step(self, action_dict):
@@ -168,7 +181,7 @@ class Deadline:
         self.rounds = rounds
         self.round = 0
 
-    def get_progress(self) -> Union[float, int]:
+    def get_progress(self) -> float | int:
         if self.rounds:
             progress = self.round / self.rounds
         else:
