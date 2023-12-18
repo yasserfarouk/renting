@@ -3,4 +3,10 @@
 .pytest_cache
 __pycache__
 
-tests/test_scenario
+tests/test_scenarios
+environment/scenarios
+
+output
+wandb
+
+*.sbatch
