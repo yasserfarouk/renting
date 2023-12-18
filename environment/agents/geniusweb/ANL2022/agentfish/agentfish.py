@@ -61,7 +61,7 @@ class AgentFish(DefaultParty):
         self.domain: Domain = None
         self.parameters: Parameters = None
         self.profile: LinearAdditiveUtilitySpace = None
-        self.progress: ProgressTime = None
+        self.progress: Progress = None
         self.me: PartyId = None
         self.other: str = None
         self.settings: Settings = None
@@ -124,6 +124,10 @@ class AgentFish(DefaultParty):
         elif isinstance(data, YourTurn):
             # execute a turn
             self.my_turn()
+
+            #NOTE: ADDED by Bram Renting:
+            if isinstance(self.progress, ProgressRounds):
+                self.progress = self.progress.advance()
 
         # Finished will be send if the negotiation has ended (through agreement or deadline)
         elif isinstance(data, Finished):

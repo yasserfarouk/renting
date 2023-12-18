@@ -18,6 +18,8 @@ from geniusweb.profile.utilityspace.LinearAdditive import LinearAdditive
 from geniusweb.profileconnection.ProfileConnectionFactory import ProfileConnectionFactory
 from geniusweb.profileconnection.ProfileInterface import ProfileInterface
 from geniusweb.progress.Progress import Progress
+from geniusweb.progress.ProgressRounds import ProgressRounds
+
 from geniusweb.references.Parameters import Parameters
 from json import dump, load
 from random import randint
@@ -95,6 +97,10 @@ class ChargingBoul(DefaultParty):
                     self.opponent_model.update(self.last_received_bid)
             elif isinstance(info, YourTurn):
                 self.my_turn()
+
+                #NOTE: ADDED by Bram Renting:
+                if isinstance(self.progress, ProgressRounds):
+                    self.progress = self.progress.advance()
             elif isinstance(info, Finished):
                 self.getReporter().log(logging.INFO, "Final outcome:" + str(info))
                 self.terminate()

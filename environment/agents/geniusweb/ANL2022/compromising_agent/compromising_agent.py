@@ -33,7 +33,9 @@ from geniusweb.profile.utilityspace.UtilitySpace import UtilitySpace
 from geniusweb.profileconnection.ProfileConnectionFactory import (
     ProfileConnectionFactory,
 )
-from geniusweb.progress.ProgressTime import ProgressTime
+from geniusweb.progress.Progress import Progress
+from geniusweb.progress.ProgressRounds import ProgressRounds
+
 from geniusweb.references.Parameters import Parameters
 from numpy import int64
 from tudelft_utilities_logging.ReportToLogger import ReportToLogger
@@ -57,7 +59,7 @@ class CompromisingAgent(DefaultParty):
         self.logger: ReportToLogger = self.getReporter()
         self.lastReceivedBid: Bid = None
         self.me: PartyId = None
-        self.progress: ProgressTime = None
+        self.progress: Progress = None
         self.protocol: str = None
         self.parameters: Parameters = None
         self.utilitySpace: UtilitySpace = None
@@ -116,6 +118,10 @@ class CompromisingAgent(DefaultParty):
             elif isinstance(data, YourTurn):
                 # execute a turn
                 self.myTurn()
+
+                #NOTE: ADDED by Bram Renting:
+                if isinstance(self.progress, ProgressRounds):
+                    self.progress = self.progress.advance()
 
             # Finished will be send if the negotiation has ended (through agreement or deadline)
             elif isinstance(data, Finished):

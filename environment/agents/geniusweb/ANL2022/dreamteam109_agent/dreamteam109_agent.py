@@ -29,7 +29,9 @@ from geniusweb.profile.utilityspace.LinearAdditiveUtilitySpace import (
 from geniusweb.profileconnection.ProfileConnectionFactory import (
     ProfileConnectionFactory,
 )
-from geniusweb.progress.ProgressTime import ProgressTime
+from geniusweb.progress.Progress import Progress
+from geniusweb.progress.ProgressRounds import ProgressRounds
+
 from geniusweb.references.Parameters import Parameters
 from tudelft_utilities_logging.ReportToLogger import ReportToLogger
 from .utils.logger import Logger
@@ -57,7 +59,7 @@ class DreamTeam109Agent(DefaultParty):
         self.domain: Domain = None
         self.parameters: Parameters = None
         self.profile: LinearAdditiveUtilitySpace = None
-        self.progress: ProgressTime = None
+        self.progress: Progress = None
         self.me: PartyId = None
         self.other: PartyId = None
         self.other_name: str = None
@@ -137,6 +139,10 @@ class DreamTeam109Agent(DefaultParty):
         elif isinstance(data, YourTurn):
             # execute a turn
             self.my_turn()
+
+            #NOTE: ADDED by Bram Renting:
+            if isinstance(self.progress, ProgressRounds):
+                self.progress = self.progress.advance()
 
         # Finished will be send if the negotiation has ended (through agreement or deadline)
         elif isinstance(data, Finished):

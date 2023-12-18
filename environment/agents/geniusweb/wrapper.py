@@ -1,18 +1,12 @@
-from collections import deque
 import json
 import shutil
 import tempfile
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-from pyson.ObjectMapper import ObjectMapper
-from tudelft_utilities_logging.Reporter import Reporter
-from uri.uri import URI
 import numpy as np
-
-# from environment.negotiation import Deadline
-from environment.scenario import UtilityFunction
 from geniusweb.actions.Accept import Accept
 from geniusweb.actions.Action import Action
 from geniusweb.actions.ActionWithBid import ActionWithBid
@@ -31,6 +25,11 @@ from geniusweb.progress.ProgressTime import ProgressTime
 from geniusweb.references.Parameters import Parameters
 from geniusweb.references.ProfileRef import ProfileRef
 from geniusweb.references.ProtocolRef import ProtocolRef
+from pyson.ObjectMapper import ObjectMapper
+from tudelft_utilities_logging.Reporter import Reporter
+from uri.uri import URI
+
+from environment.scenario import UtilityFunction
 
 
 def geniusweb_wrapper(base):

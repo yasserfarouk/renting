@@ -18,6 +18,8 @@ from geniusweb.party.Capabilities import Capabilities
 from geniusweb.party.DefaultParty import DefaultParty
 from geniusweb.profile.utilityspace.LinearAdditiveUtilitySpace import LinearAdditiveUtilitySpace
 from geniusweb.profileconnection.ProfileConnectionFactory import ProfileConnectionFactory
+from geniusweb.progress.Progress import Progress
+from geniusweb.progress.ProgressRounds import ProgressRounds
 from geniusweb.progress.ProgressTime import ProgressTime
 from geniusweb.references.Parameters import Parameters
 from tudelft_utilities_logging.ReportToLogger import ReportToLogger
@@ -38,7 +40,7 @@ class Agent007(DefaultParty):
         self.logger: ReportToLogger = self.getReporter()
         self.logger.log(logging.INFO, "party is initialized")
         self.me: PartyId = None
-        self.progress: ProgressTime = None
+        self.progress: Progress = None
         self.settings: Settings = None
         self.domain: Domain = None
         self.parameters: Parameters = None
@@ -80,6 +82,10 @@ class Agent007(DefaultParty):
         elif isinstance(data, YourTurn):    # [3] YourTurn notifies you that it is your turn to act
             action = self.chooseAction()
             self.send_action(action)
+
+            #NOTE: ADDED by Bram Renting:
+            if isinstance(self.progress, ProgressRounds):
+                self.progress = self.progress.advance()
         elif isinstance(data, Finished):    # [2] Finished will be send if the negotiation has ended (through agreement or deadline)
             self.save_data()
             self.logger.log(logging.INFO, "party is terminating:")
