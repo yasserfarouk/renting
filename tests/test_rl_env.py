@@ -8,7 +8,7 @@ from environment.negotiation import NegotiationEnv
 def env() -> NegotiationEnv:
     env_config = {
         "agent_configs": ["RL", "ANL2022.Agent007"],
-        "scenario": {"random"},
+        "scenario": "random",
         "deadline": {"rounds": 20, "ms": 10000},
         "random_agent_order": False,
         "offer_max_first": True,
