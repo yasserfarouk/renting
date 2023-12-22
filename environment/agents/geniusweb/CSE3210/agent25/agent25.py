@@ -188,7 +188,7 @@ class Agent25(DefaultParty):
             # Predicts how much the opponent is conceding based on best-fit line gradient of previous proposed bids.
             opponent_concession_estimate = -1.0
             self._session_settings.getProgress().getTerminationTime()
-            if self._session_progress.get(int(time.time())) > 0.1:
+            if self._session_progress.get(int(time.time())) > 0.1 and len(self._opponent_bid_utilities) > 20: #NOTE: second condition added by Bram Renting
                 variables = np.polyfit(
                     [x for x in range(0, 20)],
                     self._opponent_bid_utilities[

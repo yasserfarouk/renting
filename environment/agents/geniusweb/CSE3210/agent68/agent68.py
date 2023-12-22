@@ -99,8 +99,8 @@ class Agent68(DefaultParty):
         # YourTurn notifies you that it is your turn to act
         elif isinstance(info, YourTurn):
             action = self._myTurn()
-            if isinstance(self._progress, ProgressRounds):
-                self._progress = self._progress.advance()
+            # if isinstance(self._progress, ProgressRounds): #NOTE: disabled by Bram Renting as _updateRound is also called
+            #     self._progress = self._progress.advance()
             self.getConnection().send(action)
 
         # Finished will be send if the negotiation has ended (through agreement or deadline)
