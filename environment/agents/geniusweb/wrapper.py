@@ -96,7 +96,7 @@ def geniusweb_wrapper(base):
                 action = self.action
                 self.action = None
             else:
-                raise ValueError(f"Action cannot be None, agent_id: {self.agent_id}")
+                raise ValueError(f"Action cannot be None, agent_id: {type(self).__name__}")
 
             self.notifyChange(ActionDone(action))
 
