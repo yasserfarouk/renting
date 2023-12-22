@@ -13,5 +13,5 @@ AGENTS: dict[str, DefaultParty] = {
     "HardlinerAgent": HardlinerAgent,
     "LinearAgent": LinearAgent,
     "RandomAgent": RandomAgent,
-    "StupidAgent": StupidAgent,
+    # "StupidAgent": StupidAgent, #NOTE: disabled because test agent
 }

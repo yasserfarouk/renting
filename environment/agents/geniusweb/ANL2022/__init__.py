@@ -31,8 +31,8 @@ AGENTS = {
     "LearningAgent": LearningAgent,
     "LuckyAgent2022": LuckyAgent2022,
     "MiCROAgent": MiCROAgent,
-    # "Pinar_Agent": Pinar_Agent,
-    # "ProcrastinAgent": ProcrastinAgent,
+    # "Pinar_Agent": Pinar_Agent, #NOTE: requires lightgbm package
+    # "ProcrastinAgent": ProcrastinAgent, #NOTE: can't handle first offer accepted
     "RGAgent": RGAgent,
     "SmartAgent": SmartAgent,
     "SuperAgent": SuperAgent,

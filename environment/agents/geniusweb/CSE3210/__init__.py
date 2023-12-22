@@ -32,7 +32,7 @@ AGENTS = {
     "agent14": Agent14,
     "agent18": Agent18,
     "agent19": Agent19,
-    "agent22": Agent22,
+    "agent22": Agent22, #NOTE: throws scipy divide by zero errors, not sure of the effect
     "agent24": Agent24,
     "agent25": Agent25,
     "agent26": Agent26,
@@ -47,7 +47,7 @@ AGENTS = {
     "agent55": Agent55,
     "agent58": Agent58,
     "agent61": Agent61,
-    # "agent64": Agent64,
+    "agent64": Agent64,
     "agent67": Agent67,
-    # "agent68": Agent68,
+    "agent68": Agent68,
 }
