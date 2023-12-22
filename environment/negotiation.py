@@ -1,6 +1,7 @@
+import signal
 import time
-# import wandb
 from collections import deque
+from contextlib import contextmanager
 from itertools import cycle
 from pathlib import Path
 
@@ -17,6 +18,7 @@ class NegotiationEnv(MultiAgentEnv):
         self.env_config = env_config
         self.agent_configs = env_config["agent_configs"]
         self._agent_ids = set([f"agent_{n}" for n in range(len(self.agent_configs))])
+        self.used_agents = {a: AGENTS[a] for a in env_config["used_agents"]}
         super().__init__()
 
         # if env_config["wandb_enabled"]:
@@ -48,7 +50,8 @@ class NegotiationEnv(MultiAgentEnv):
             {
                 "my_offer": offer_action_space,
                 "opp_offer": offer_action_space,
-                "time": Box(-0.1, 1.1, dtype=np.float32),
+                # "opponent_encoding": Discrete(len(self.used_agents)),
+                "time": Box(-0, 1, dtype=np.float32),
             }
         )
 
@@ -67,6 +70,8 @@ class NegotiationEnv(MultiAgentEnv):
             self.deadline = Deadline(ms=self.env_config["deadline"]["ms"])
         else:
             raise ValueError("Deadline parameter not recognized")
+        
+        # self.opponent_encoding = np.array([0], dtype=np.int32)
 
         self.agents = []
         self.rl_agents = set()
@@ -75,14 +80,17 @@ class NegotiationEnv(MultiAgentEnv):
                 self.rl_agents.add(agent_id)
                 agent = None
             elif agent_config == "random":
-                agent_class = self.np_random.choice(list(AGENTS.values()))
+                agent_type, agent_class = self.np_random.choice(list(self.used_agents.items()))
                 agent = agent_class(agent_id, utility_function, self.deadline)
-            elif agent_config in AGENTS:
-                agent_class = AGENTS[agent_config]
+                # self.opponent_encoding = self.env_config["used_agents"].index(agent_type)
+            elif agent_config in self.used_agents:
+                agent_class = self.used_agents[agent_config]
                 agent = agent_class(agent_id, utility_function, self.deadline)
             else:
                 raise ValueError("Agent config not recognized")
 
+            # if agent:
+            #     print(type(agent).__name__)
             self.agents.append((agent_id, agent, utility_function))
 
         if self.env_config["random_agent_order"]:
@@ -102,6 +110,8 @@ class NegotiationEnv(MultiAgentEnv):
             action = action_dict[self.current_agent_id]
             action["agent_id"] = self.current_agent_id
             self.last_actions.append(action)
+            if self.last_actions[-1]["agent_id"] == self.agents[-1][0]:
+                self.deadline.advance_round()
 
         while not self.deadline.reached() and (len(self.last_actions) < 1 or not self.last_actions[-1]["accept"]):
             
@@ -116,9 +126,25 @@ class NegotiationEnv(MultiAgentEnv):
                     rews = {self.current_agent_id: 0}
                     return obs, rews, {"__all__": False}, {"__all__": False}, {}
             else:
-                action: dict = agent.select_action(self.last_actions)
+                try:
+                    with time_limit(60):
+                        #NOTE: hardcoded agents can hang, requiring a timeout.
+                        # we set it to 60 seconds and break of if it takes longer
+                        action: dict = agent.select_action(self.last_actions)
+                except TimeoutException as e:
+                    print(f"{type(agent).__name__}: {e}")
+                    break
 
             self.last_actions.append(action)
+            if self.last_actions[-1]["agent_id"] == self.agents[-1][0]:
+                self.deadline.advance_round()
+
+            # if len(self.last_actions) > 0 and self.last_actions[-1]["accept"] and self.deadline.round == 1:
+            #     print([type(a).__name__ for _, a, _ in self.agents if a])
+            #     #TODO: hacky solution to agents that accept in the first round
+            #     # we hardcoded the first offer of an agent causing no observations to be
+            #     # returned if this happends. Ray cannot deal with that.
+            #     return self.step(None)
 
 
         if self.last_actions[-1]["accept"]:
@@ -157,6 +183,7 @@ class NegotiationEnv(MultiAgentEnv):
         obs = {
             "my_offer": last_actions[0]["offer"],
             "opp_offer": last_actions[1]["offer"],
+            # "opponent_encoding": self.opponent_encoding,
             "time": np.array([self.deadline.get_progress()], dtype=np.float32)
         }
         return {agent_id: obs}
@@ -169,7 +196,7 @@ class BidHistory:
 
 class Deadline:
     #TODO: fix infinite deadline, currently it is > 1 year
-    def __init__(self, ms: int=2**35, rounds: int = None):
+    def __init__(self, ms: int = 2**35, rounds: int = None):
         assert ms or rounds
         if ms and ms <= 0:
             raise ValueError(f"ms must be positive but is {ms}")
@@ -195,4 +222,20 @@ class Deadline:
 
     def advance_round(self):
         self.round += 1
+
+
+class TimeoutException(Exception):
+    pass
+
+
+@contextmanager
+def time_limit(seconds):
+    def signal_handler(signum, frame):
+        raise TimeoutException("Timed out!")
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
 
