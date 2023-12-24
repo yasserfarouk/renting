@@ -1,87 +1,61 @@
+from typing import Any, Mapping
+
 import gymnasium as gym
 import numpy as np
-
+import torch
 from ray.rllib.algorithms.ppo.ppo import PPOConfig
-from ray.rllib.algorithms.ppo.torch.ppo_torch_rl_module import PPOTorchRLModule
-from ray.rllib.core.models.configs import MLPHeadConfig
-from ray.rllib.core.rl_module.rl_module import SingleAgentRLModuleSpec
+from ray.rllib.algorithms.ppo.ppo_rl_module import PPORLModule
+from ray.rllib.core.models.base import ACTOR, CRITIC, ENCODER_OUT, STATE_OUT
+from ray.rllib.core.models.configs import ActorCriticEncoderConfig, MLPHeadConfig
+from ray.rllib.core.rl_module.rl_module import RLModule, SingleAgentRLModuleSpec
+from ray.rllib.core.rl_module.torch import TorchRLModule
 from ray.rllib.examples.env.random_env import RandomEnv
 from ray.rllib.models.torch.torch_distributions import TorchCategorical
-from ray.rllib.examples.models.mobilenet_v2_encoder import (
-    MobileNetV2EncoderConfig,
-    MOBILENET_INPUT_SHAPE,
-)
-from ray.rllib.core.models.configs import ActorCriticEncoderConfig
-from ray.rllib.core.rl_module.rl_module import SingleAgentRLModuleSpec
-
-class MyFixedPPO(PPOTorchRLModule):
-    """A PPORLModules with mobilenet v2 as an encoder.
-
-    The idea behind this model is to demonstrate how we can bypass catalog to
-    take full control over what models and action distribution are being built.
-    In this example, we do this to modify an existing RLModule with a custom encoder.
-    """
-
-    # def setup(self):
-    #     mobilenet_v2_config = MobileNetV2EncoderConfig()
-    #     # Since we want to use PPO, which is an actor-critic algorithm, we need to
-    #     # use an ActorCriticEncoderConfig to wrap the base encoder config.
-    #     actor_critic_encoder_config = ActorCriticEncoderConfig(
-    #         base_encoder_config=mobilenet_v2_config
-    #     )
-
-    #     self.encoder = actor_critic_encoder_config.build(framework="torch")
-    #     mobilenet_v2_output_dims = mobilenet_v2_config.output_dims
-
-    #     pi_config = MLPHeadConfig(
-    #         input_dims=mobilenet_v2_output_dims,
-    #         output_layer_dim=2,
-    #     )
-
-    #     vf_config = MLPHeadConfig(
-    #         input_dims=mobilenet_v2_output_dims, output_layer_dim=1
-    #     )
-
-    #     self.pi = pi_config.build(framework="torch")
-    #     self.vf = vf_config.build(framework="torch")
-
-    #     self.action_dist_cls = TorchCategorical
-        
-
-# from typing import Mapping, Any
-# from ray.rllib.core.rl_module.torch.torch_rl_module import TorchRLModule
-# from ray.rllib.core.rl_module.rl_module import RLModuleConfig
-# from ray.rllib.utils.nested_dict import NestedDict
-
-# import torch
-# import torch.nn as nn
+from ray.rllib.policy.sample_batch import SampleBatch
+from ray.rllib.utils.annotations import override
+from ray.rllib.utils.framework import try_import_torch
+from ray.rllib.utils.nested_dict import NestedDict
+from torch.nn import Linear, Parameter
+from torch_geometric.nn import MessagePassing
+from torch_geometric.utils import add_self_loops, degree
 
 
-# class DiscreteBCTorchModule(TorchRLModule):
-#     def __init__(self, config: RLModuleConfig) -> None:
-#         super().__init__(config)
+class MyFixedPPO(TorchRLModule, PPORLModule):
+    framework: str = "torch"
 
-#     def setup(self):
-#         input_dim = self.config.observation_space.shape[0]
-#         hidden_dim = self.config.model_config_dict["fcnet_hiddens"][0]
-#         output_dim = self.config.action_space.n
+    def setup(self):
+        self.encoder = torch.nn.Linear(32,2)
+        self.pi = torch.nn.Linear(2,2)
+        self.vf = torch.nn.Linear(2,2)
 
-#         self.policy = nn.Sequential(
-#             nn.Linear(input_dim, hidden_dim),
-#             nn.ReLU(),
-#             nn.Linear(hidden_dim, output_dim),
-#         )
 
-#         self.input_dim = input_dim
+    @override(RLModule)
+    def _forward_train(self, batch: NestedDict) -> Mapping[str, Any]:
+        output = {}
 
-#     def _forward_inference(self, batch: NestedDict) -> Mapping[str, Any]:
-#         with torch.no_grad():
-#             return self._forward_train(batch)
+        # Shared encoder
+        encoder_outs = self.encoder(batch["obs"])
+        if STATE_OUT in encoder_outs:
+            output["state_out"] = encoder_outs[STATE_OUT]
 
-#     def _forward_exploration(self, batch: NestedDict) -> Mapping[str, Any]:
-#         with torch.no_grad():
-#             return self._forward_train(batch)
+        # Value head
+        vf_out = self.vf(encoder_outs[ENCODER_OUT][CRITIC])
+        output["vf_preds"] = vf_out.squeeze(-1)
 
-#     def _forward_train(self, batch: NestedDict) -> Mapping[str, Any]:
-#         action_logits = self.policy(batch["obs"])
-#         return {"action_dist": torch.distributions.Categorical(logits=action_logits)}
+        # Policy head
+        action_logits = self.pi(encoder_outs[ENCODER_OUT][ACTOR])
+        output["action_dist_inputs"] = action_logits
+
+        # {"action_dist": torch.distributions.Categorical(logits=action_logits)}
+        return output
+
+    @override(RLModule)
+    def _forward_inference(self, batch: NestedDict) -> Mapping[str, Any]:
+        with torch.no_grad():
+            return self._forward_train(batch)
+
+    @override(RLModule)
+    def _forward_exploration(self, batch: NestedDict) -> Mapping[str, Any]:
+        with torch.no_grad():
+            return self._forward_train(batch)
+
