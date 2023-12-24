@@ -25,10 +25,10 @@ AGENTS = {
     "AgentFO2": AgentFO2,
     "BIU_agent": BIU_agent,
     "ChargingBoul": ChargingBoul,
-    "CompromisingAgent": CompromisingAgent,
+    # "CompromisingAgent": CompromisingAgent, #NOTE: causes many Action cannot be None errors
     "DreamTeam109Agent": DreamTeam109Agent,
     "GEAAgent": GEAAgent,
-    "LearningAgent": LearningAgent,
+    # "LearningAgent": LearningAgent, #NOTE: causes many Action cannot be None errors
     "LuckyAgent2022": LuckyAgent2022,
     "MiCROAgent": MiCROAgent,
     # "Pinar_Agent": Pinar_Agent, #NOTE: requires lightgbm package
