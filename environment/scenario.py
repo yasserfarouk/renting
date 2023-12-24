@@ -61,17 +61,14 @@ class UtilityFunction:
         with open(file, "w") as f:
             f.write(json.dumps(weights, indent=2))
 
-    def get_utility(self, bid: list | tuple):
+    def get_utility(self, outcome: list | tuple):
         return sum(
-            self.objective_weights[o] * self.value_weights[o][v] for o, v in enumerate(bid)
+            self.objective_weights[o] * self.value_weights[o][v] for o, v in enumerate(outcome)
         )
     
-    def get_max_utility_bid(self):
-        bid = [max(vw, key=vw.get) for vw in self.value_weights.values()]
-        # for i in range(len(self.value_weights)):
-        #     isseu_value_weights = self.value_weights[i]
-        #     bid.append(max(isseu_value_weights, key=isseu_value_weights.get))
-        return bid
+    @property
+    def max_utility_outcome(self):
+        return [max(vw, key=vw.get) for vw in self.value_weights.values()]
 
 
 class Scenario:
@@ -80,9 +77,9 @@ class Scenario:
         objectives: dict,
         utility_function_A: UtilityFunction,
         utility_function_B: UtilityFunction,
-        SW_bid=None,
-        nash_bid=None,
-        kalai_bid=None,
+        SW_outcome=None,
+        nash_outcome=None,
+        kalai_outcome=None,
         pareto_front=None,
         distribution=None,
         opposition=None,
@@ -91,9 +88,9 @@ class Scenario:
         self.objectives = objectives
         self.utility_function_A = utility_function_A
         self.utility_function_B = utility_function_B
-        self.SW_bid = SW_bid
-        self.nash_bid = nash_bid
-        self.kalai_bid = kalai_bid
+        self.SW_outcome = SW_outcome
+        self.nash_outcome = nash_outcome
+        self.kalai_outcome = kalai_outcome
         self.pareto_front = pareto_front
         self.distribution = distribution
         self.opposition = opposition
@@ -114,7 +111,7 @@ class Scenario:
             multiplier = (size / np.prod(spread)) ** (1.0 / num_objectives)
             values_per_objective = np.round(multiplier * spread).astype(np.int32)
             values_per_objective = np.clip(values_per_objective, 2, None)
-            if abs(size - np.prod(values_per_objective)) < (0.1 * size):
+            if (abs(size - np.prod(values_per_objective)) < (0.1 * size)) and values_per_objective.sum() < 1000:
                 break
 
         objectives = {i: [v for v in range(vs)] for i, vs in enumerate(values_per_objective)}
@@ -143,9 +140,9 @@ class Scenario:
                     objectives,
                     utility_function_A,
                     utility_function_B,
-                    SW_bid=specials["social_welfare"],
-                    nash_bid=specials["nash"],
-                    kalai_bid=specials["kalai"],
+                    SW_outcome=specials["social_welfare"],
+                    nash_outcome=specials["nash"],
+                    kalai_outcome=specials["kalai"],
                     pareto_front=specials["pareto_front"],
                     distribution=specials["distribution"],
                     opposition=specials["opposition"],
@@ -158,53 +155,53 @@ class Scenario:
         return cls(objectives, utility_function_A, utility_function_B)
 
     def calculate_specials(self):
-        if self.nash_bid:
+        if self.nash_outcome:
             return False
-        self.pareto_front = self.get_pareto(list(self.iter_bids()))
-        self.distribution = self.get_distribution(self.iter_bids())
+        self.pareto_front = self.get_pareto(list(self.iter_outcomes()))
+        self.distribution = self.get_distribution(self.iter_outcomes())
 
         SW_utility = 0
         nash_utility = 0
         kalai_diff = 10
 
-        for pareto_bid in self.pareto_front:
-            utility_function_A, utility_B = pareto_bid["utility"][0], pareto_bid["utility"][1]
+        for pareto_outcome in self.pareto_front:
+            utility_function_A, utility_B = pareto_outcome["utility"][0], pareto_outcome["utility"][1]
 
             utility_diff = abs(utility_function_A - utility_B)
             utility_prod = utility_function_A * utility_B
             utility_sum = utility_function_A + utility_B
 
             if utility_diff < kalai_diff:
-                self.kalai_bid = pareto_bid
+                self.kalai_outcome = pareto_outcome
                 kalai_diff = utility_diff
                 self.opposition = sqrt((utility_function_A - 1.0) ** 2 + (utility_B - 1.0) ** 2)
             if utility_prod > nash_utility:
-                self.nash_bid = pareto_bid
+                self.nash_outcome = pareto_outcome
                 nash_utility = utility_prod
             if utility_sum > SW_utility:
-                self.SW_bid = pareto_bid
+                self.SW_outcome = pareto_outcome
                 SW_utility = utility_sum
 
         return True
 
     def generate_visualisation(self):
-        bid_utils = [self.get_utilities(bid) for bid in self.iter_bids()]
-        bid_utils = list(zip(*bid_utils))
+        outcome_utils = [self.get_utilities(outcome) for outcome in self.iter_outcomes()]
+        outcome_utils = list(zip(*outcome_utils))
 
         fig = go.Figure()
 
         fig.add_trace(
             go.Scatter(
-                x=bid_utils[0],
-                y=bid_utils[1],
+                x=outcome_utils[0],
+                y=outcome_utils[1],
                 mode="markers",
-                name="bids",
+                name="outcomes",
                 marker=dict(size=3),
             )
         )
 
         if self.pareto_front:
-            pareto_utils = [bid["utility"] for bid in self.pareto_front]
+            pareto_utils = [outcome["utility"] for outcome in self.pareto_front]
             pareto_utils = list(zip(*pareto_utils))
             fig.add_trace(
                 go.Scatter(
@@ -217,8 +214,8 @@ class Scenario:
                 )
             )
 
-        if self.nash_bid:
-            x, y = self.nash_bid["utility"]
+        if self.nash_outcome:
+            x, y = self.nash_outcome["utility"]
             fig.add_trace(
                 go.Scatter(
                     x=[x],
@@ -229,8 +226,8 @@ class Scenario:
                 )
             )
 
-        if self.SW_bid:
-            x, y = self.SW_bid["utility"]
+        if self.SW_outcome:
+            x, y = self.SW_outcome["utility"]
             fig.add_trace(
                 go.Scatter(
                     x=[x],
@@ -241,8 +238,8 @@ class Scenario:
                 )
             )
 
-        if self.kalai_bid:
-            x, y = self.kalai_bid["utility"]
+        if self.kalai_outcome:
+            x, y = self.kalai_outcome["utility"]
             fig.add_trace(
                 go.Scatter(
                     x=[x],
@@ -258,7 +255,7 @@ class Scenario:
 
         fig.update_layout(
             title=dict(
-                text=f"<sub>(size: {len(list(self.iter_bids()))}, opposition: {self.opposition:.4f}, distribution: {self.distribution:.4f})</sub>",
+                text=f"<sub>(size: {len(list(self.iter_outcomes()))}, opposition: {self.opposition:.4f}, distribution: {self.distribution:.4f})</sub>",
                 x=0.5,
                 xanchor="center",
             )
@@ -276,17 +273,17 @@ class Scenario:
         self.utility_function_A.to_file(directory / "utility_function_A.json")
         self.utility_function_B.to_file(directory / "utility_function_B.json")
 
-        if self.nash_bid:
+        if self.nash_outcome:
             with open(directory / "specials.json", "w") as f:
                 f.write(
                     json.dumps(
                         {
-                            "size": len(list(self.iter_bids())),
+                            "size": len(list(self.iter_outcomes())),
                             "opposition": self.opposition,
                             "distribution": self.distribution,
-                            "social_welfare": self.SW_bid,
-                            "nash": self.nash_bid,
-                            "kalai": self.kalai_bid,
+                            "social_welfare": self.SW_outcome,
+                            "nash": self.nash_outcome,
+                            "kalai": self.kalai_outcome,
                             "pareto_front": self.pareto_front,
                         },
                         indent=2,
@@ -296,106 +293,106 @@ class Scenario:
         if self.visualisation:
             self.visualisation.write_image(file=directory / "visualisation.pdf", scale=5)
 
-    def iter_bids(self) -> Iterable:
+    def iter_outcomes(self) -> Iterable:
         return iter(self)
 
-    def get_utilities(self, bid):
-        return self.utility_function_A.get_utility(bid), self.utility_function_B.get_utility(bid)
+    def get_utilities(self, outcome):
+        return self.utility_function_A.get_utility(outcome), self.utility_function_B.get_utility(outcome)
 
-    def get_pareto(self, all_bids: list):
+    def get_pareto(self, all_outcomes: list):
         pareto_front = []
-        # dominated_bids = set()
+        # dominated_outcomes = set()
         while True:
-            candidate_bid = all_bids.pop(0)
-            bid_nr = 0
+            candidate_outcome = all_outcomes.pop(0)
+            outcome_nr = 0
             dominated = False
-            while len(all_bids) != 0 and bid_nr < len(all_bids):
-                bid = all_bids[bid_nr]
-                if self._dominates(candidate_bid, bid):
-                    # If it is dominated remove the bid from all bids
-                    all_bids.pop(bid_nr)
-                    # dominated_bids.add(frozenset(bid.items()))
-                elif self._dominates(bid, candidate_bid):
+            while len(all_outcomes) != 0 and outcome_nr < len(all_outcomes):
+                outcome = all_outcomes[outcome_nr]
+                if self._dominates(candidate_outcome, outcome):
+                    # If it is dominated remove the outcome from all outcomes
+                    all_outcomes.pop(outcome_nr)
+                    # dominated_outcomes.add(frozenset(outcome.items()))
+                elif self._dominates(outcome, candidate_outcome):
                     dominated = True
-                    # dominated_bids.add(frozenset(candidate_bid.items()))
-                    bid_nr += 1
+                    # dominated_outcomes.add(frozenset(candidate_outcome.items()))
+                    outcome_nr += 1
                 else:
-                    bid_nr += 1
+                    outcome_nr += 1
 
             if not dominated:
-                # add the non-dominated bid to the Pareto frontier
+                # add the non-dominated outcome to the Pareto frontier
                 pareto_front.append(
                     {
-                        "bid": candidate_bid,
+                        "outcome": candidate_outcome,
                         "utility": [
-                            self.utility_function_A.get_utility(candidate_bid),
-                            self.utility_function_B.get_utility(candidate_bid),
+                            self.utility_function_A.get_utility(candidate_outcome),
+                            self.utility_function_B.get_utility(candidate_outcome),
                         ],
                     }
                 )
 
-            if len(all_bids) == 0:
+            if len(all_outcomes) == 0:
                 break
 
         pareto_front = sorted(pareto_front, key=lambda d: d["utility"][0])
 
         return pareto_front
 
-    def get_distribution(self, bids_iter) -> float:
+    def get_distribution(self, outcomes_iter) -> float:
         min_distance_sum = 0.0
 
-        for i, bid in enumerate(bids_iter):
-            min_distance = self.distance_to_pareto(bid)
+        for i, outcome in enumerate(outcomes_iter):
+            min_distance = self.distance_to_pareto(outcome)
             min_distance_sum += min_distance
 
         distribution = min_distance_sum / (i + 1)
 
         return distribution
 
-    def _dominates(self, bid, candidate_bid):
-        if self.utility_function_A.get_utility(bid) < self.utility_function_A.get_utility(candidate_bid):
+    def _dominates(self, outcome, candidate_outcome):
+        if self.utility_function_A.get_utility(outcome) < self.utility_function_A.get_utility(candidate_outcome):
             return False
-        elif self.utility_function_B.get_utility(bid) < self.utility_function_B.get_utility(
-            candidate_bid
+        elif self.utility_function_B.get_utility(outcome) < self.utility_function_B.get_utility(
+            candidate_outcome
         ):
             return False
         else:
             return True
 
-    def distance_to_pareto(self, bid):
+    def distance_to_pareto(self, outcome):
         if not self.pareto_front:
             raise ValueError("Pareto front not calculated")
 
         min_distance = 5.0
         for pareto_element in self.pareto_front:
-            pareto_bid = pareto_element["bid"]
-            distance = self.distance(pareto_bid, bid)
+            pareto_outcome = pareto_element["outcome"]
+            distance = self.distance(pareto_outcome, outcome)
             if distance < min_distance:
                 min_distance = distance
 
         return min_distance
 
-    def distance(self, bid1, bid2=None):
-        """calculate Euclidian distance in terms of utility between a bid and 0 or between two bids.
+    def distance(self, outcome1, outcome2=None):
+        """calculate Euclidian distance in terms of utility between a outcome and 0 or between two outcomes.
 
         Args:
-            bid1 (dict[str, str]): bid dictionary where keys are issues and values are the values
-            bid2 (dict[str, str], optional): see bid1. Defaults to None.
+            outcome1 (dict[str, str]): outcome dictionary where keys are issues and values are the values
+            outcome2 (dict[str, str], optional): see outcome1. Defaults to None.
 
         Returns:
             float: Euclidian distance
         """
-        if bid2 and bid1:
-            a = (self.utility_function_A.get_utility(bid1) - self.utility_function_A.get_utility(bid2)) ** 2
-            b = (self.utility_function_B.get_utility(bid1) - self.utility_function_B.get_utility(bid2)) ** 2
-        elif bid1:
-            a = self.utility_function_A.get_utility(bid1) ** 2
-            b = self.utility_function_B.get_utility(bid1) ** 2
+        if outcome2 and outcome1:
+            a = (self.utility_function_A.get_utility(outcome1) - self.utility_function_A.get_utility(outcome2)) ** 2
+            b = (self.utility_function_B.get_utility(outcome1) - self.utility_function_B.get_utility(outcome2)) ** 2
+        elif outcome1:
+            a = self.utility_function_A.get_utility(outcome1) ** 2
+            b = self.utility_function_B.get_utility(outcome1) ** 2
         else:
-            raise ValueError("receive None bid")
+            raise ValueError("receive None outcome")
         return math.sqrt(a + b)
 
     def __iter__(self) -> tuple:
-        bids_values = product(*self.objectives.values())
-        for bid_values in bids_values:
-            yield bid_values #{i: v for i, v in zip(self.objectives.keys(), bid_values)}
+        outcomes_values = product(*self.objectives.values())
+        for outcome_values in outcomes_values:
+            yield outcome_values

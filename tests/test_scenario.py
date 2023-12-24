@@ -23,7 +23,7 @@ def test_create_visualisation():
 
 def test_save_and_load():
     scenario = Scenario.create_random(400, default_rng())
-    bid = next(scenario.iter_bids())
+    bid = next(scenario.iter_outcomes())
     utility_before = scenario.get_utilities(bid)
     scenario.to_directory(Path("tests/test_scenarios/utility"))
     scenario.calculate_specials()

@@ -1,7 +1,11 @@
 import json
+import os
 import shutil
+import signal
+import sys
 import tempfile
 from collections import deque
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
@@ -33,14 +37,14 @@ from environment.scenario import UtilityFunction
 
 
 def geniusweb_wrapper(base):
-    class GeniusWebAgent(base): #TODO: set to base
-        def __init__(self, agent_id: str, utility_function, deadline, parameters: dict = {}) -> None:
+    class GeniusWebAgent(base):  # TODO: set to base
+        def __init__(self, agent_id: str, utility_function, deadline, parameters: dict = {}):
             super().__init__(DummyReporter())
             self.agent_id = agent_id
+            self.utility_function = utility_function
             self.action = None
 
             self.connection = DummyConnection()
-
 
             self.tmp_dir = Path(tempfile.gettempdir()) / "geniusweb" / str(uuid4())
             self.tmp_dir.mkdir(parents=True)
@@ -54,11 +58,19 @@ def geniusweb_wrapper(base):
             profile_uri = URI(f"file:{self.tmp_profile_fn}")
             profile_ref = ProfileRef(profile_uri)
 
-            #TODO: make sure that all agents can handle round based deadlines
+            # TODO: make sure that all agents can handle round based deadlines
             if deadline.rounds:
-                progress = ProgressRounds(deadline.rounds, 0, datetime.fromtimestamp((deadline.start_time_ms + deadline.ms) / 1000))
+                progress = ProgressRounds(
+                    deadline.rounds,
+                    0,
+                    datetime.fromtimestamp(
+                        (deadline.start_time_ms + deadline.ms) / 1000
+                    ),
+                )
             else:
-                progress = ProgressTime(deadline.ms, datetime.fromtimestamp(deadline.start_time_ms / 1000))
+                progress = ProgressTime(
+                    deadline.ms, datetime.fromtimestamp(deadline.start_time_ms / 1000)
+                )
 
             protocol = ProtocolRef(URI("SAOP"))
 
@@ -80,14 +92,28 @@ def geniusweb_wrapper(base):
         def send_action(self, action: Action):
             self.action = action
 
+        def notifyChange(self, inform):
+            with HiddenPrints():
+                super().notifyChange(inform)
+
         def getConnection(self):
             return self.connection
 
-        def select_action(self, last_actions: deque[dict]) -> dict:
+        def select_action(self, last_actions: deque[dict], seconds: int= 60):
+            try:
+                with time_limit(seconds):
+                    # NOTE: hardcoded agents can hang, requiring a timeout.
+                    action = self.select_action_with_timeout(last_actions)
+                    return action, False
+            except TimeoutException as e:
+                print(f"{type(self.current_agent).__name__}: {e}")
+                return None, True
+
+        def select_action_with_timeout(self, last_actions: deque[dict]) -> dict:
             for prev_action in last_actions:
                 if prev_action["agent_id"] != self.agent_id:
                     self.communicate_action(prev_action)
-            
+
             self.notifyChange(YourTurn())
             if self.connection.action:
                 action = self.connection.action
@@ -96,7 +122,9 @@ def geniusweb_wrapper(base):
                 action = self.action
                 self.action = None
             else:
-                raise ValueError(f"Action cannot be None, agent_id: {type(self).__name__}")
+                raise ValueError(
+                    f"Action cannot be None, agent_id: {type(self).__name__}"
+                )
 
             self.notifyChange(ActionDone(action))
 
@@ -112,7 +140,9 @@ def geniusweb_wrapper(base):
                 self.communicate_action(last_action)
             if last_action["accept"] == 1:
                 bid = self._dict_action_to_geniusweb_action(last_action).getBid()
-                agreements = Agreements({PartyId(action["agent_id"]): bid for action in last_actions})
+                agreements = Agreements(
+                    {PartyId(action["agent_id"]): bid for action in last_actions}
+                )
             else:
                 agreements = Agreements({})
 
@@ -127,29 +157,31 @@ def geniusweb_wrapper(base):
                 action_dict = {"accept": np.int32(1)}
             else:
                 raise ValueError(f"Action {action} not supported")
-            
+
             issue_values = action._bid._issuevalues
-            offer = [int(issue_values[str(i)]._value) for i in range(len(issue_values))]
-            # bid_dict = {int(i): int(v._value) for i, v in action._bid._issuevalues.items()}
-            action_dict["offer"] = np.array(offer, dtype=np.int32)
+            outcome = [int(issue_values[str(i)]._value) for i in range(len(issue_values))]
+            action_dict["outcome"] = np.array(outcome, dtype=np.int32)
             action_dict["agent_id"] = self.agent_id
 
             return action_dict
 
         def _dict_action_to_geniusweb_action(self, action: dict) -> ActionWithBid:
-            bid = Bid({str(i):  DiscreteValue(str(v)) for i, v in enumerate(action["offer"])})
+            bid = Bid(
+                {str(i): DiscreteValue(str(v)) for i, v in enumerate(action["outcome"])}
+            )
             if action["accept"] == 0:
                 action_GW = Offer(PartyId(action["agent_id"]), bid)
             elif action["accept"] == 1:
                 action_GW = Accept(PartyId(action["agent_id"]), bid)
             else:
                 raise ValueError(f"Action {action} not supported")
-            
+
             return action_GW
-        
+
     GeniusWebAgent.__name__ = base.__name__
 
     return GeniusWebAgent
+
 
 class DummyConnection:
     def __init__(self) -> None:
@@ -167,15 +199,51 @@ class DummyReporter(Reporter):
         pass
 
 
-def convert_utility_to_geniusweb(utility_function: UtilityFunction):
-    issue_weights = {str(iss): w for iss, w in utility_function.objective_weights.items()}
-    value_weights = {str(iss): {str(v): w for v, w in values.items()} for iss, values in utility_function.value_weights.items()}
+class HiddenPrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, "w")
 
-    issuesValues = {issue: {"values": list(values.keys())} for issue, values in value_weights.items()}
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
+
+
+class TimeoutException(Exception):
+    pass
+
+
+@contextmanager
+def time_limit(seconds):
+    def signal_handler(signum, frame):
+        raise TimeoutException("Timed out!")
+
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+
+
+def convert_utility_to_geniusweb(utility_function: UtilityFunction):
+    issue_weights = {
+        str(iss): w for iss, w in utility_function.objective_weights.items()
+    }
+    value_weights = {
+        str(iss): {str(v): w for v, w in values.items()}
+        for iss, values in utility_function.value_weights.items()
+    }
+
+    issuesValues = {
+        issue: {"values": list(values.keys())}
+        for issue, values in value_weights.items()
+    }
     domain = {"name": "tmp_domain", "issuesValues": issuesValues}
 
     issue_utilities = {
-        i: {"DiscreteValueSetUtilities": {"valueUtilities": v}} for i, v in value_weights.items()
+        i: {"DiscreteValueSetUtilities": {"valueUtilities": v}}
+        for i, v in value_weights.items()
     }
     profile = {
         "LinearAdditiveUtilitySpace": {

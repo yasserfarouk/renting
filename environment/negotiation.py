@@ -1,16 +1,17 @@
-import signal
-import time
 from collections import deque
-from contextlib import contextmanager
 from itertools import cycle
 from pathlib import Path
 
 import numpy as np
-from gymnasium.spaces import Box, Dict, Discrete, MultiDiscrete
+from gymnasium.spaces import Box, Dict, Discrete, MultiDiscrete, Sequence
+from ray.rllib.utils.spaces.repeated import Repeated
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
 from environment.agents.geniusweb import AGENTS
 from environment.scenario import Scenario
+from environment.deadline import Deadline
+from environment.agents.rl_agent import RLAgent
+from geniusweb.party.DefaultParty import DefaultParty
 
 
 class NegotiationEnv(MultiAgentEnv):
@@ -28,7 +29,7 @@ class NegotiationEnv(MultiAgentEnv):
         #         group=env_config["wandb_config"]["group"],
         #     )
 
-    def reset(self, seed=None, options=None):
+    def reset(self, *, seed=None, options=None):
         # Call super's `reset()` method to (maybe) set the given `seed`.
         super().reset(seed=seed, options=options)
 
@@ -37,21 +38,53 @@ class NegotiationEnv(MultiAgentEnv):
         else:
             self.scenario = Scenario.from_directory(Path(self.env_config["scenario"]))
 
-        offer_action_space = MultiDiscrete([len(v) for v in self.scenario.objectives.values()], dtype=np.int32)
-        # self.action_offset = np.cumsum(np.insert(offer_action_space, 0, 0)[:-1])
+
+        values_per_objective = [len(v) for v in self.scenario.objectives.values()]
+        outcome_space = MultiDiscrete(values_per_objective, dtype=np.int32)
+        # self.action_offset = np.cumsum(np.insert(outcome_space, 0, 0)[:-1])
 
         self.action_space = Dict(
             {
-                "offer": offer_action_space,
+                "outcome": outcome_space,
                 "accept": Discrete(2),
             }
         )
+        # self.observation_space = Dict(
+        #     {
+        #         "my_outcome": outcome_space,
+        #         "opp_outcome": outcome_space,
+        #         "opponent_encoding": Discrete(len(self.used_agents)),
+        #         "time": Box(-0, 1, dtype=np.float32),
+        #     }
+        # )
+        # self.observation_space = Dict(
+        #     {
+        #         "head_node": Box(
+        #             np.array([0, 0]), np.array([np.inf, 1]), dtype=np.float32
+        #         ),  # #objectives, time (implicit num offers)
+        #         "objective_nodes": Repeated(
+        #             Box(np.array([0, 0]), np.array([np.inf, 1]), dtype=np.float32),
+        #             max_len=10
+        #         ),  # #values, weight,
+        #         "value_nodes": Repeated(
+        #             Box(np.array([0, 0, 0, 0]), np.array([1, 1, 1, 1]), dtype=np.float32),
+        #             max_len=1000,
+        #         ),  # weight, average offered, my outcome, opp outcome
+        #     }
+        # )
         self.observation_space = Dict(
             {
-                "my_offer": offer_action_space,
-                "opp_offer": offer_action_space,
-                # "opponent_encoding": Discrete(len(self.used_agents)),
-                "time": Box(-0, 1, dtype=np.float32),
+                "head_node": Box(
+                    np.array([0, 0]), np.array([np.inf, 1]), dtype=np.float32
+                ),  # #objectives, time (implicit num offers)
+                "objective_nodes": Sequence(
+                    Box(np.array([0, 0]), np.array([np.inf, 1]), dtype=np.float32),
+                    stack=True,
+                ),  # #values, weight,
+                "value_nodes": Sequence(
+                    Box(np.array([0, 0, 0, 0]), np.array([1, 1, 1, 1]), dtype=np.float32),
+                    stack=True,
+                ),  # weight, average offered, my outcome, opp outcome
             }
         )
 
@@ -60,8 +93,6 @@ class NegotiationEnv(MultiAgentEnv):
 
         # TODO: list based utility functions in scenario
         utility_functions = [self.scenario.utility_function_A, self.scenario.utility_function_B]
-        # for utility_function, agent_config in zip(utility_functions, self.agent_configs):
-        #     agent_config["utility_function"] = utility_function
 
 
         if "rounds" in self.env_config["deadline"]:
@@ -74,24 +105,22 @@ class NegotiationEnv(MultiAgentEnv):
         # self.opponent_encoding = np.array([0], dtype=np.int32)
 
         self.agents = []
-        self.rl_agents = set()
-        for agent_id, agent_config, utility_function in zip(self._agent_ids, self.agent_configs, utility_functions):
+        for agent_id, agent_config, utility_function in zip(sorted(self._agent_ids), self.agent_configs, utility_functions):
             if agent_config == "RL":
-                self.rl_agents.add(agent_id)
-                agent = None
+                agent_class = RLAgent
             elif agent_config == "random":
                 agent_type, agent_class = self.np_random.choice(list(self.used_agents.items()))
-                agent = agent_class(agent_id, utility_function, self.deadline)
+                # self.opponent_encoding = self.env_config["used_agents"].index(agent_type)
+            elif agent_config == "all":
+                agent_type, agent_class = list(self.used_agents.items())[self.env_config.worker_index - 1]
                 # self.opponent_encoding = self.env_config["used_agents"].index(agent_type)
             elif agent_config in self.used_agents:
                 agent_class = self.used_agents[agent_config]
-                agent = agent_class(agent_id, utility_function, self.deadline)
             else:
                 raise ValueError("Agent config not recognized")
-
-            # if agent:
-            #     print(type(agent).__name__)
-            self.agents.append((agent_id, agent, utility_function))
+            
+            agent = agent_class(agent_id, utility_function, self.deadline)
+            self.agents.append(agent)
 
         if self.env_config["random_agent_order"]:
             self.np_random.shuffle(self.agents)
@@ -102,67 +131,53 @@ class NegotiationEnv(MultiAgentEnv):
 
         return obs, infos
 
+    def register_action(self, action):
+        self.last_actions.append(action)
+        if self.current_agent.agent_id == self.agents[-1].agent_id:
+            self.deadline.advance_round()
 
     def step(self, action_dict):
         if action_dict:
-            if self.current_agent_id not in action_dict:
-                raise ValueError(f"{self.current_agent_id} not in {action_dict}")
-            action = action_dict[self.current_agent_id]
-            action["agent_id"] = self.current_agent_id
-            self.last_actions.append(action)
-            if self.last_actions[-1]["agent_id"] == self.agents[-1][0]:
-                self.deadline.advance_round()
+            if self.current_agent.agent_id not in action_dict:
+                raise ValueError(f"{self.current_agent.agent_id} not in {action_dict}")
+            action = action_dict[self.current_agent.agent_id]
+            action["agent_id"] = self.current_agent.agent_id
+            self.register_action(action)
 
         while not self.deadline.reached() and (len(self.last_actions) < 1 or not self.last_actions[-1]["accept"]):
             
-            self.current_agent_id, agent, utility_function = next(self.agents_iter)
+            self.current_agent = next(self.agents_iter)
             
-            if self.current_agent_id in self.rl_agents:
+            if isinstance(self.current_agent, RLAgent):
                 if self.env_config["offer_max_first"] and len(self.last_actions) < 2:
-                    offer = np.array(utility_function.get_max_utility_bid(), dtype=np.int32)
-                    action = {"agent_id": self.current_agent_id, "offer": offer, "accept": 0}
+                    action = self.current_agent.get_first_action(self.last_actions)
                 else:
-                    obs = self.get_observation(self.current_agent_id, self.last_actions)
-                    rews = {self.current_agent_id: 0}
+                    obs = self.current_agent.get_observation(self.last_actions, self.deadline)
+                    rews = {self.current_agent.agent_id: 0}
                     return obs, rews, {"__all__": False}, {"__all__": False}, {}
-            else:
-                try:
-                    with time_limit(60):
-                        #NOTE: hardcoded agents can hang, requiring a timeout.
-                        # we set it to 60 seconds and break of if it takes longer
-                        action: dict = agent.select_action(self.last_actions)
-                except TimeoutException as e:
-                    print(f"{type(agent).__name__}: {e}")
+            elif isinstance(self.current_agent, DefaultParty):
+                action, timeout = self.current_agent.select_action(self.last_actions)
+                if timeout:
                     break
-
-            self.last_actions.append(action)
-            if self.last_actions[-1]["agent_id"] == self.agents[-1][0]:
-                self.deadline.advance_round()
-
-            # if len(self.last_actions) > 0 and self.last_actions[-1]["accept"] and self.deadline.round == 1:
-            #     print([type(a).__name__ for _, a, _ in self.agents if a])
-            #     #TODO: hacky solution to agents that accept in the first round
-            #     # we hardcoded the first offer of an agent causing no observations to be
-            #     # returned if this happends. Ray cannot deal with that.
-            #     return self.step(None)
+            else:
+                raise ValueError(f"Agent type {self.current_agent} not recognized")
+            
+            self.register_action(action)
 
 
         if self.last_actions[-1]["accept"]:
             # NOTE: disabled the following assert because of rl actions
-            # assert self.last_actions[-1]["offer"] == self.last_actions[-2]["offer"]
+            # assert self.last_actions[-1]["outcome"] == self.last_actions[-2]["outcome"]
             rew = {
-                agent_id: np.float32(utility_function.get_utility(self.last_actions[0]["offer"]))
-                for agent_id, _, utility_function in self.agents
+                agent.agent_id: np.float32(agent.utility_function.get_utility(self.last_actions[0]["outcome"]))
+                for agent in self.agents
             }
         else:
-            rew = {agent_id: np.float32(0) for agent_id, _, _ in self.agents}
+            rew = {agent.agent_id: np.float32(0) for agent in self.agents}
 
-        [agent.final(self.last_actions) for _, agent, _ in self.agents if agent]
+        [agent.final(self.last_actions) for agent in self.agents if isinstance(agent, DefaultParty)]
 
-        opponent_utility = {type(agent).__name__: rew[agent_id] for agent_id, agent, _ in self.agents if agent}
-        # if self.env_config["wandb_enabled"]:
-        #     [wandb.log({type(agent).__name__: rew[agent_id]}) for agent_id, agent, _ in self.agents if agent]
-
+        opponent_utility = {type(agent).__name__: rew[agent.agent_id] for agent in self.agents}
 
         infos = {"__common__": {"opponent_utility": opponent_utility}}
 
@@ -170,72 +185,4 @@ class NegotiationEnv(MultiAgentEnv):
         return {}, rew, {"__all__": True}, {"__all__": True}, infos
         # return observation, reward, terminated, truncated, info
 
-    # def step(self, action_dict):
-    #     if self.current_agent_id not in action_dict:
-    #         raise ValueError(f"{self.current_agent_id} not in {action_dict}")
-    #     action = action_dict[self.current_agent_id]
-    #     action["agent_id"] = self.current_agent_id
-    #     self.last_actions.append(action)
-    #     self.negotiate()
-
-    def get_observation(self, agent_id, last_actions):
-        #TODO: construct proper observation
-        obs = {
-            "my_offer": last_actions[0]["offer"],
-            "opp_offer": last_actions[1]["offer"],
-            # "opponent_encoding": self.opponent_encoding,
-            "time": np.array([self.deadline.get_progress()], dtype=np.float32)
-        }
-        return {agent_id: obs}
-
-
-class BidHistory:
-    def __init__(self) -> None:
-        self.test = None
-
-
-class Deadline:
-    #TODO: fix infinite deadline, currently it is > 1 year
-    def __init__(self, ms: int = 2**35, rounds: int = None):
-        assert ms or rounds
-        if ms and ms <= 0:
-            raise ValueError(f"ms must be positive but is {ms}")
-        if rounds and rounds <= 2:
-            raise ValueError(f"rounds must be at least 3 but is {rounds}")
-
-        self.start_time_ms = time.time() * 1000
-        self.ms = ms
-        self.rounds = rounds
-        self.round = 0
-
-    def get_progress(self) -> float | int:
-        if self.rounds:
-            progress = self.round / self.rounds
-        else:
-            progress = (time.time() * 1000 - self.start_time_ms) / self.ms
-        
-        # clip progress to [0, 1]
-        return min(max(progress, 0), 1)
-
-    def reached(self) -> bool:
-        return True if self.get_progress() == 1 else False
-
-    def advance_round(self):
-        self.round += 1
-
-
-class TimeoutException(Exception):
-    pass
-
-
-@contextmanager
-def time_limit(seconds):
-    def signal_handler(signum, frame):
-        raise TimeoutException("Timed out!")
-    signal.signal(signal.SIGALRM, signal_handler)
-    signal.alarm(seconds)
-    try:
-        yield
-    finally:
-        signal.alarm(0)
 

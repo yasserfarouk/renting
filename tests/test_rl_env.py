@@ -29,8 +29,8 @@ def test_reset(env: NegotiationEnv):
 def test_observation(env: NegotiationEnv):
     obs, _ = env.reset()
     agent_id = next(iter(obs.keys()))
-    offer = np.array(env.agents[0][2].get_max_utility_bid(), dtype=np.int32)
-    action = {"agent_id": agent_id, "offer": offer, "accept": 0}
+    outcome = np.array(env.agents[0].utility_function.max_utility_outcome, dtype=np.int32)
+    action = {"agent_id": agent_id, "outcome": outcome, "accept": 0}
     obs, rews, terminated, truncated, _ = env.step({agent_id: action})
     obs = next(iter(obs.values()))
     assert env.observation_space.contains(obs)
@@ -39,8 +39,8 @@ def test_observation(env: NegotiationEnv):
 def test_deadline(env: NegotiationEnv):
     obs, _ = env.reset()
     agent_id = next(iter(obs.keys()))
-    offer = np.array(env.agents[0][2].get_max_utility_bid(), dtype=np.int32)
-    max_action = {"agent_id": agent_id, "offer": offer, "accept": 0}
+    outcome = np.array(env.agents[0].utility_function.max_utility_outcome, dtype=np.int32)
+    max_action = {"agent_id": agent_id, "outcome": outcome, "accept": 0}
     for i in range(1, DEADLINE):
         assert env.deadline.round == i
         obs, rews, terminated, truncated, _ = env.step({agent_id: max_action})
