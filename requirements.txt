@@ -1,8 +1,11 @@
 https://tracinsy.ewi.tudelft.nl/pubtrac/GeniusWebPython/export/100/geniuswebcore/dist/geniusweb-1.2.1.tar.gz
-ray[rllib]
+ray[rllib]==2.9.0
 torch
 torch_geometric
 pytest
 plotly
 scikit-learn
 kaleido
+wandb
+gputil
+psutil
