@@ -49,5 +49,5 @@ AGENTS = {
     "agent61": Agent61,
     "agent64": Agent64,
     "agent67": Agent67,
-    "agent68": Agent68,
+    # "agent68": Agent68, #NOTE: can't handle opening bid
 }

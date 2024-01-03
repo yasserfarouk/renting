@@ -21,36 +21,46 @@ class RLAgent:
             v for v in utility_function.objective_weights.values()
         ]
 
-        self.value_weights = [
-            v2 for v1 in utility_function.value_weights.values() for v2 in v1.values()
-        ]
-        self.num_opp_actions = 0
-        self.action_offset = np.cumsum(np.insert(self.values_per_objective, 0, 0)[:-1])
-        self.counted_opp_outcomes = np.zeros(len(self.value_weights), dtype=np.float32)
+        self.max_num_values = max(self.values_per_objective)
+        self.value_weights = np.array([list(v.values()) + [0] * (self.max_num_values - len(v)) for v in utility_function.value_weights.values()],dtype=np.float32)
+        self.counted_opp_outcomes = np.zeros_like(self.value_weights, dtype=np.float32)
+        self.fraction_opp_outcomes = np.zeros_like(self.value_weights, dtype=np.float32)
+        self.value_nodes_mask = np.array([[True] * len(v) + [False] * (self.max_num_values - len(v)) for v in utility_function.value_weights.values()],dtype=bool)
 
-    def get_observation(self, last_actions: deque[dict], deadline: Deadline) -> dict:
-        self.register_opp_action(last_actions[-1])
-        my_outcome = np.zeros_like(self.value_weights)
-        my_outcome[self.action_offset + last_actions[-2]["outcome"]] = 1
-        opp_outcome = np.zeros_like(self.value_weights)
-        opp_outcome[self.action_offset + last_actions[-1]["outcome"]] = 1
-        # TODO: construct proper observation
+
+        self.objective_nodes_features =  np.array([[v, o] for v, o in zip(self.values_per_objective, self.objective_weights)], dtype=np.float32)
+
+        self.num_opp_actions = 0
+
+    def get_observation(self, last_actions: deque[dict], deadline: Deadline, opponent_encoding) -> dict:
+        my_outcome = np.zeros_like(self.value_weights, dtype=np.float32)
+        opp_outcome = np.zeros_like(self.value_weights, dtype=np.float32)
+        accept_mask = np.ones(2, dtype=bool)
+
+        if len(last_actions) == 0:
+            accept_mask[1] = False
+        if len(last_actions) > 0:
+            self.register_opp_action(last_actions[-1])
+            opp_outcome[np.arange(len(opp_outcome)), last_actions[-1]["outcome"]] = 1
+        if len(last_actions) > 1:
+            my_outcome[np.arange(len(my_outcome)), last_actions[-2]["outcome"]] = 1
+
         obs = {
-            "head_node": np.array(
-                [self.num_objectives, deadline.get_progress()], dtype=np.float32
-            ),
-            "objective_nodes": np.array(
-                [self.values_per_objective, self.objective_weights], dtype=np.float32
-            ).T,
-            "value_nodes": np.array(
+            "head_node": np.array([self.num_objectives, deadline.get_progress()], dtype=np.float32),
+            "objective_nodes": self.objective_nodes_features,
+            "value_nodes": np.stack(
                 [
                     self.value_weights,
-                    self.counted_opp_outcomes / self.num_opp_actions,
+                    self.fraction_opp_outcomes,
                     my_outcome,
                     opp_outcome,
                 ],
+                axis=-1,
                 dtype=np.float32,
-            ).T,
+            ),
+            "value_nodes_mask": self.value_nodes_mask,
+            "opponent_encoding": opponent_encoding,
+            "accept_mask": accept_mask,
         }
         return {self.agent_id: obs}
 
@@ -62,5 +72,5 @@ class RLAgent:
 
     def register_opp_action(self, action: dict):
         self.num_opp_actions += 1
-        outcome_index = self.action_offset + action["outcome"]
-        self.counted_opp_outcomes[outcome_index] += 1
+        self.counted_opp_outcomes[np.arange(len(self.counted_opp_outcomes)), action["outcome"]] += 1
+        self.fraction_opp_outcomes = self.counted_opp_outcomes / self.num_opp_actions

@@ -163,7 +163,7 @@ class ChargingBoul(DefaultParty):
         else:
             bid = self.make_bid()
         # Check if we've previously gotten a better bid already
-        if self.best_received_util >= self.util_space.getUtility(bid):
+        if (self.best_received_util >= self.util_space.getUtility(bid)) and len(self.received_bids) > 1: #NOTE: last condition added by Bram Renting to prevent index error
             i = self.received_utils.index(self.best_received_util)
             bid = self.received_bids.pop(i)
             self.received_utils.pop(i)
@@ -172,17 +172,17 @@ class ChargingBoul(DefaultParty):
             i = self.received_utils.index(self.best_received_util)
             self.best_received_bid = self.received_bids[i]
         # Take action
-        my_action: Action
+        self.my_action: Action = None
         if bid == None or (
             self.last_received_bid != None
             and self.util_space.getUtility(self.last_received_bid)
             >= self.util_space.getUtility(bid)
         ):
             # if bid==null we failed to suggest next bid.
-            my_action = Accept(self.me, self.last_received_bid)
+            self.my_action = Accept(self.me, self.last_received_bid)
         else:
-            my_action = Offer(self.me, bid)
-        self.getConnection().send(my_action)
+            self.my_action = Offer(self.me, bid)
+        self.getConnection().send(self.my_action)
 
     def make_concession(self):
         self.min_util = Decimal(0.3)

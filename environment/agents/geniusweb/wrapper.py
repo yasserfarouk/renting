@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import shutil
 import signal
 import sys
@@ -99,14 +100,21 @@ def geniusweb_wrapper(base):
         def getConnection(self):
             return self.connection
 
-        def select_action(self, last_actions: deque[dict], seconds: int= 60):
+        def select_action(self, last_actions: deque[dict], seconds: int = 60):
+            # return self.select_action_with_timeout(last_actions), False
+            time_start = time.time()
             try:
                 with time_limit(seconds):
                     # NOTE: hardcoded agents can hang, requiring a timeout.
                     action = self.select_action_with_timeout(last_actions)
+                    time_end = time.time()
+                    if (time_end - time_start) > 1:
+                        print(
+                            f"{type(self).__name__}: Action took {time_end - time_start} seconds"
+                        )
                     return action, False
             except TimeoutException as e:
-                print(f"{type(self.current_agent).__name__}: {e}")
+                print(f"{type(self).__name__}: {e}")
                 return None, True
 
         def select_action_with_timeout(self, last_actions: deque[dict]) -> dict:
