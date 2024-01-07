@@ -23,7 +23,7 @@ AGENTS = {
     "Agent4410": Agent4410,
     "AgentFish": AgentFish,
     "AgentFO2": AgentFO2,
-    "BIU_agent": BIU_agent,
+    # "BIU_agent": BIU_agent, #NOTE: times out >60 secs
     "ChargingBoul": ChargingBoul,
     # "CompromisingAgent": CompromisingAgent, #NOTE: causes Action cannot be None errors
     "DreamTeam109Agent": DreamTeam109Agent,
