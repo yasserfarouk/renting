@@ -1,9 +1,9 @@
 from typing import Any, Mapping
-from gymnasium import spaces
+
 import torch
 import torch.nn.functional as F
+from gymnasium import spaces
 from ray.rllib.algorithms.ppo.ppo_rl_module import PPORLModule
-from ray.rllib.core.models.specs.specs_dict import SpecDict
 from ray.rllib.core.rl_module.rl_module import RLModule
 from ray.rllib.core.rl_module.torch import TorchRLModule
 from ray.rllib.models.torch.torch_distributions import (
@@ -11,12 +11,16 @@ from ray.rllib.models.torch.torch_distributions import (
     TorchMultiCategorical,
     TorchMultiDistribution,
 )
-from ray.rllib.policy.sample_batch import SampleBatch
 from ray.rllib.utils.annotations import override
 from ray.rllib.utils.nested_dict import NestedDict
 from torch import Tensor, nn
-from torch_geometric.nn.conv.gcn_conv import GCNConv
+from torch_geometric.nn import GCNConv, GAT, GATv2Conv
 from torch_scatter import scatter
+
+from policy.custom_layers import DirectedGraphAttention
+from torch_scatter import scatter, scatter_softmax
+from torch_geometric.data import Batch, Data
+
 
 class BaseModel(TorchRLModule, PPORLModule):
     framework: str = "torch"
@@ -244,33 +248,196 @@ class GraphToGraph2(BaseModel):
 
         # return {"vf_preds": vf_out, "action_dist": {"accept": None, "outcome": None}}
         return {"vf_preds": vf_out, "action_dist_inputs": action_logits}
-        
-    # @override(RLModule)
-    # def _forward_train(self, batch: NestedDict) -> Mapping[str, Any]:
-    #     pass
-
-    # @override(RLModule)
-    # def _forward_inference(self, batch: NestedDict) -> Mapping[str, Any]:
-    #     with torch.no_grad():
-    #         _, action_dist = self._forward_train(batch)
-    #     return {"action": action_dist.sample()}
-
-    # @override(RLModule)
-    # def _forward_exploration(self, batch: NestedDict) -> Mapping[str, Any]:
-    #     with torch.no_grad():
-    #         _, action_dist = self._forward_train(batch)
     
-    # @override(RLModule)
-    # def output_specs_inference(self):
-    #     return ["action_dist"]
 
-    # @override(RLModule)
-    # def output_specs_exploration(self):
-    #     return ["vf_preds", "action_dist"]
+class AttentionGraphToGraph(BaseModel):
 
-    # @override(RLModule)
-    # def output_specs_train(self):
-    #     return ["vf_preds", "action_dist"]
+    def setup(self):
+        self.num_used_agents = self.config.model_config_dict["num_used_agents"]
+        self.use_opponent_encoding = self.config.model_config_dict["use_opponent_encoding"]
+        self.pooling_op = self.config.model_config_dict["pooling_op"]
+
+        match self.pooling_op:
+            case "max":
+                self.head_pool = lambda x: torch.max(x, 1)[0]
+            case "mean":
+                self.head_pool = lambda x: torch.mean(x, 1)
+            case "sum":
+                self.head_pool = lambda x: torch.sum(x, 1)
+            case "min":
+                self.head_pool = lambda x: torch.min(x, 1)[0]
+            case "mul":
+                self.head_pool = lambda x: torch.prod(x, 1)
+            case _:
+                raise ValueError(f"Pooling op {self.pooling_op} not supported")
+
+
+        head_features = 2 + self.num_used_agents if self.use_opponent_encoding else 2
+
+        num_h_obj = 32
+        num_h_head = 32
+
+        self.f_a_val_obj = nn.Linear(6, 1)
+        self.f_enc_val = nn.Linear(4, 16)
+        self.f_enc_val_obj = nn.Linear(16 + 2, num_h_obj)
+
+        self.f_a_obj_head = nn.Linear(num_h_obj + head_features, 1)
+        self.f_enc_obj = nn.Linear(num_h_obj, num_h_obj)
+        self.f_enc_obj_head = nn.Linear(num_h_obj + head_features, num_h_head)
+
+        self.b_a_head_obj = nn.Linear(num_h_head + num_h_obj, 1)
+        self.b_enc_head = nn.Linear(num_h_head, num_h_obj)
+        self.b_enc_head_obj = nn.Linear(num_h_head + num_h_obj, num_h_obj)
+
+
+        self.b_a_obj_val = nn.Linear(num_h_obj + 4, 1)
+        self.b_enc_obj = nn.Linear(num_h_obj, num_h_obj)
+        self.b_enc_obj_val = nn.Linear(num_h_obj + 4, 1)
+
+        self.accept_head = nn.Linear(num_h_head, 2)
+        self.vf = torch.nn.Linear(num_h_head, 1)
+
+        action_space = self.config.action_space
+        logit_lens = [int(action_space["accept"].n), int(sum(action_space["outcome"].nvec))]
+        child_distribution_cls_struct = {
+            "accept": TorchCategorical,
+            "outcome": TorchMultiCategorical.get_partial_dist_cls(space=action_space["outcome"], input_lens=list(action_space["outcome"].nvec))
+        }
+        self.action_dist_cls = TorchMultiDistribution.get_partial_dist_cls(
+            space=action_space,
+            child_distribution_cls_struct=child_distribution_cls_struct,
+            input_lens=logit_lens,
+        )
+
+    @override(RLModule)
+    def _forward_train(self, batch: NestedDict) -> Mapping[str, Any]:
+        head_node: Tensor = batch["obs"]["head_node"]
+        objective_nodes: Tensor = batch["obs"]["objective_nodes"]
+        value_nodes: Tensor = batch["obs"]["value_nodes"]
+        value_adjacency: Tensor = batch["obs"]["value_adjacency"]
+        opponent_encoding: Tensor = F.one_hot(batch["obs"]["opponent_encoding"], self.num_used_agents)
+        accept_mask: Tensor = batch["obs"]["accept_mask"]
+
+        if self.use_opponent_encoding:
+            head_node = torch.cat((head_node, opponent_encoding), dim=-1)
+
+        # value nodes to objective nodes
+        objective_nodes_expand = objective_nodes.gather(1, value_adjacency.unsqueeze(-1).expand(-1, -1, objective_nodes.shape[2]))
+        h1 = torch.cat((objective_nodes_expand, value_nodes), dim=-1)
+
+        att1 = scatter_softmax(self.f_a_val_obj(h1), value_adjacency, 1)
+
+        h2 = att1 * F.relu(self.f_enc_val(value_nodes))
+        h3 = scatter(h2, value_adjacency, dim=1, reduce="sum")
+
+        h4 = torch.cat((objective_nodes, h3), dim=-1)
+        h_objective_nodes1 = F.relu(self.f_enc_val_obj(h4))
+
+        # objective nodes to head node
+        num_objectives = objective_nodes.shape[1]
+        head_node_expand = head_node.unsqueeze(1).expand(-1, num_objectives, -1)
+        h5 = torch.cat([h_objective_nodes1, head_node_expand], 2)
+
+        att2 = F.softmax(self.f_a_obj_head(h5), 1)
+
+        h6 = att2 * F.relu(self.f_enc_obj(h_objective_nodes1))
+        h7 = torch.sum(h6, 1)
+        h8 = torch.cat([h7, head_node], 1)
+        h_head = F.relu(self.f_enc_obj_head(h8))
+
+        # head node to objective nodes
+        h10 = F.relu(self.b_enc_head(h_head))
+        h10_expand = h10.unsqueeze(1).expand(-1, num_objectives, -1)
+        h11 = torch.cat([h10_expand, h_objective_nodes1], 2)
+        h_objective_nodes2 = F.relu(self.b_enc_head_obj(h11))
+
+        # objective nodes to value nodes
+        h12 = F.relu(self.b_enc_obj(h_objective_nodes2))
+        h12_expand = h12.gather(1, value_adjacency.unsqueeze(2).expand(-1, -1, h12.shape[2]))
+        h13 = torch.cat([h12_expand, value_nodes], 2)
+        offer_action_logits = F.relu(self.b_a_obj_val(h13)).squeeze(-1)
+
+        # head node to accept action
+        accept_inf_mask = torch.max(torch.log(accept_mask), torch.Tensor([torch.finfo(torch.float32).min]))
+        accept_action_logits = F.relu(self.accept_head(h_head)) + accept_inf_mask
+
+        # head node to value function
+        vf_out = self.vf(h_head).squeeze(-1)
+
+        # gather action logits
+        action_logits = torch.cat((accept_action_logits, offer_action_logits), dim=-1)
+
+        # return {"vf_preds": vf_out, "action_dist": {"accept": None, "outcome": None}}
+        return {"vf_preds": vf_out, "action_dist_inputs": action_logits}
+    
+class AttentionGraphToGraph2(BaseModel):
+
+    def setup(self):
+        self.num_used_agents = self.config.model_config_dict["num_used_agents"]
+        self.use_opponent_encoding = self.config.model_config_dict["use_opponent_encoding"]
+        self.pooling_op = self.config.model_config_dict["pooling_op"]
+
+
+        head_features = 2 + self.num_used_agents if self.use_opponent_encoding else 2
+
+        self.val_obj = GATv2Conv((4, 2), 32)
+        self.obj_head = GATv2Conv((32, head_features), 32)
+        self.head_obj = GATv2Conv((32, 32), 32)
+        self.obj_val = GATv2Conv((32, 4), 1)
+
+        self.accept_head = nn.Linear(32, 2)
+        self.vf = nn.Linear(32, 1)
+
+        action_space = self.config.action_space
+        logit_lens = [int(action_space["accept"].n), int(sum(action_space["outcome"].nvec))]
+        child_distribution_cls_struct = {
+            "accept": TorchCategorical,
+            "outcome": TorchMultiCategorical.get_partial_dist_cls(space=action_space["outcome"], input_lens=list(action_space["outcome"].nvec))
+        }
+        self.action_dist_cls = TorchMultiDistribution.get_partial_dist_cls(
+            space=action_space,
+            child_distribution_cls_struct=child_distribution_cls_struct,
+            input_lens=logit_lens,
+        )
+
+    @override(RLModule)
+    def _forward_train(self, batch: NestedDict) -> Mapping[str, Any]:
+        head_node: Tensor = batch["obs"]["head_node"]
+        objective_nodes: Tensor = batch["obs"]["objective_nodes"]
+        value_nodes: Tensor = batch["obs"]["value_nodes"]
+        edge_indices_val_obj: Tensor = batch["obs"]["edge_indices_val_obj"]
+        edge_indices_obj_head: Tensor = batch["obs"]["edge_indices_obj_head"]
+        opponent_encoding: Tensor = F.one_hot(batch["obs"]["opponent_encoding"], self.num_used_agents)
+        accept_mask: Tensor = batch["obs"]["accept_mask"]
+
+        if self.use_opponent_encoding:
+            head_node = torch.cat((head_node, opponent_encoding), dim=-1)
+
+        offer_action_logits = []
+        h_head_out = []
+        for vn, ob, hn, eivo, eioh in zip(value_nodes, objective_nodes, head_node, edge_indices_val_obj, edge_indices_obj_head):
+            h_obj = F.relu(self.val_obj((vn, ob), eivo))
+            h_head = F.relu(self.obj_head((h_obj, hn), eioh))
+            h_obj = F.relu(self.head_obj((h_head, h_obj), eioh.flip(0)))
+            offer_action_logits.append(self.obj_val((h_obj, vn), eivo.flip(0)).squeeze(-1).unsqueeze(0))
+            h_head_out.append(h_head)
+
+        offer_action_logits = torch.cat(offer_action_logits, dim=0)
+        h_head_out = torch.cat(h_head_out, dim=0)
+        # head node to accept action
+        accept_inf_mask = torch.max(torch.log(accept_mask), torch.Tensor([torch.finfo(torch.float32).min]))
+        accept_action_logits = F.relu(self.accept_head(h_head_out)) + accept_inf_mask
+
+        # head node to value function
+        vf_out = self.vf(h_head_out).squeeze(-1)
+
+        # gather action logits
+        action_logits = torch.cat((accept_action_logits, offer_action_logits), dim=-1)
+
+        # return {"vf_preds": vf_out, "action_dist": {"accept": None, "outcome": None}}
+        return {"vf_preds": vf_out, "action_dist_inputs": action_logits}
+    
+
 class GraphToGraphLargeFixedAction(BaseModel):
 
     def setup(self):
@@ -554,19 +721,25 @@ class GraphToFixed(BaseModel):
         return {"vf_preds": vf_out, "action_dist_inputs": action_logits}
 
 
-class PureGCN(BaseModel):
+class PureGNN(BaseModel):
     def setup(self):
         action_space = self.config.action_space
         self.logit_lens = [int(action_space["accept"].n), int(sum(action_space["outcome"].nvec))]
         self.num_used_agents = self.config.model_config_dict["num_used_agents"]
+        self.use_opponent_encoding = self.config.model_config_dict["use_opponent_encoding"]
 
         hidden_size = self.config.model_config_dict["hidden_size"]
 
-        self.gcn_layers = [GCNConv(hidden_size, hidden_size) for _ in range(self.config.model_config_dict["num_gcn_layers"])]
 
-        self.head_encoder = nn.Linear(2 + self.num_used_agents, hidden_size)
+        if self.use_opponent_encoding:
+            self.head_encoder = nn.Linear(2 + self.num_used_agents, hidden_size)
+        else:
+            self.head_encoder = nn.Linear(2, hidden_size)
         self.objective_encoder = nn.Linear(2, hidden_size)
         self.value_encoder = nn.Linear(4, hidden_size)
+
+        self.gnn_layers = GAT(hidden_size, hidden_size, self.config.model_config_dict["num_gcn_layers"], hidden_size, v2=True)
+        # self.skip_connects = [nn.Linear(2 * hidden_size, hidden_size) for _ in range(self.config.model_config_dict["num_gcn_layers"])]
 
         self.accept_head = nn.Linear(hidden_size, 2)
         self.offer_head = nn.Linear(hidden_size, 1)
@@ -591,19 +764,30 @@ class PureGCN(BaseModel):
         opponent_encoding: Tensor = F.one_hot(batch["obs"]["opponent_encoding"], self.num_used_agents)
         accept_mask: Tensor = batch["obs"]["accept_mask"]
 
-        h_head_node = F.relu(self.head_encoder(torch.cat((head_node, opponent_encoding), dim=-1)))
+        if self.use_opponent_encoding:
+            head_node = torch.cat((head_node, opponent_encoding), dim=-1)
+
+        h_head_node = F.relu(self.head_encoder(head_node))
         h_objective_nodes = F.relu(self.objective_encoder(objective_nodes))
         h_value_nodes = F.relu(self.value_encoder(value_nodes))
 
         h_nodes = torch.cat((h_head_node.unsqueeze(1), h_objective_nodes, h_value_nodes), dim=1)
 
-        for gcn_layer in self.gcn_layers:
-            # h_nodes_out = []
-            # for h, e in zip(h_nodes, edge_indices):
-            #     out = gcn_layer(h, e)
-            #     h_nodes_out.append(F.relu(out))
-            h_nodes = torch.cat([F.relu(gcn_layer(h, e)).unsqueeze(0) for h, e in zip(h_nodes, edge_indices)], dim=0)
-            # h_nodes = torch.cat(h_nodes_out, dim=0)
+        # graph_batch = Batch([Data(x, e) for x, e in zip(h_nodes, edge_indices)])
+        # for i, (gnn_layer, skip_connect) in enumerate(zip(self.gnn_layers, self.skip_connects)):
+        #     h_nodes = gnn_layer(graph_batch.x, graph_batch.edge_index)
+        #     h_nodes_out = torch.cat([F.relu(gnn_layer(h, e)).unsqueeze(0) for h, e in zip(h_nodes_in, edge_indices)], dim=0)
+        #     h_nodes_out = torch.cat((h_nodes_in, h_nodes_out), dim=-1)
+        #     h_nodes_in = F.relu(skip_connect(h_nodes_out))
+
+        h_nodes = torch.cat([F.relu(self.gnn_layers(h, e)).unsqueeze(0) for h, e in zip(h_nodes, edge_indices)], dim=0)
+        # for gcn_layer in self.gcn_layers:
+        #     h_nodes_out = []
+        #     for h, e in zip(h_nodes, edge_indices):
+        #         out = gcn_layer(h, e)
+        #         h_nodes_out.append(F.relu(out))
+        #     h_nodes = torch.cat([F.relu(gcn_layer(h, e)).unsqueeze(0) for h, e in zip(h_nodes, edge_indices)], dim=0)
+        #     h_nodes = torch.cat(h_nodes_out, dim=0)
 
 
         h_value_nodes_out = h_nodes[:, -value_nodes.shape[1]:, :]

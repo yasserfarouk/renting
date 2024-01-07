@@ -8,7 +8,7 @@ from gymnasium.spaces import Dict
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
 from environment.agents.geniusweb import AGENTS
-from environment.agents.rl_agent import (HigaEtAl, RLAgent, RLAgentGraphObs,
+from environment.agents.rl_agent import (HigaEtAl, RLAgent, RLAgentGraphObs, RLAgentGraphObs2,
                                          RLAgentStackedObs, RLAgentGraphObsPartialAdj, RLAgentGraphObsPartialAdjFixedLargeAction, Test)
 from environment.deadline import Deadline
 from environment.scenario import Scenario
@@ -18,7 +18,9 @@ REQUIRED_RL_AGENT = {
     "GraphToFixed": RLAgentStackedObs,
     "GraphToGraph": RLAgentStackedObs,
     "GraphToGraph2": RLAgentGraphObsPartialAdj,
-    "PureGCN": RLAgentGraphObs,
+    "AttentionGraphToGraph": RLAgentGraphObsPartialAdj,
+    "AttentionGraphToGraph2": RLAgentGraphObs2,
+    "PureGNN": RLAgentGraphObs,
     "HigaEtAl": HigaEtAl,
     "FixedToFixed": HigaEtAl,
     "FixedToFixed2": HigaEtAl,
@@ -148,6 +150,8 @@ class NegotiationEnv(MultiAgentEnv):
         # agent. However, this observation is not used for training, so it should not matter.
         # We prevent RLLib from sampling a random obs from an old obs_space instead, which causes errors.
         obs = {agent.agent_id: agent.get_observation(self.last_actions, self.deadline, self.opponent_encoding) for agent in self.agents if isinstance(agent, RLAgent)}
+
+        self.scenario.calculate_specials()
         infos = {"__common__": {"utility_all_agents": utility_all_agents}}
 
         return obs, rew, {"__all__": True}, {"__all__": True}, infos

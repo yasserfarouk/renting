@@ -2,11 +2,8 @@ import argparse
 from pathlib import Path
 
 import ray
-from gymnasium.spaces import MultiDiscrete
 from numpy.random import default_rng
-from ray.rllib.algorithms import AlgorithmConfig
 from ray.rllib.algorithms.ppo import PPOConfig
-from ray.rllib.algorithms.ppo.ppo_catalog import PPOCatalog
 from ray.rllib.core.rl_module.marl_module import MultiAgentRLModuleSpec
 from ray.rllib.core.rl_module.rl_module import SingleAgentRLModuleSpec
 from ray.rllib.env.env_context import EnvContext
@@ -17,15 +14,15 @@ from environment.negotiation import NegotiationEnv
 from environment.scenario import Scenario
 from policy.callbacks import InfoCallback
 from policy.learner import CustomPPOTorchLearner
-from policy.PPO import (FixedToFixed, FixedToFixed2, GraphToFixed,
-                        GraphToGraph, GraphToGraph2,
-                        GraphToGraphLargeFixedAction, HigaEtAl, PureGCN, Test)
+from policy.PPO import (FixedToFixed, FixedToFixed2, GraphToFixed, AttentionGraphToGraph,
+                        GraphToGraph, GraphToGraph2, AttentionGraphToGraph2,
+                        GraphToGraphLargeFixedAction, HigaEtAl, PureGNN, Test)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--wandb", action="store_true")
 parser.add_argument("--debug", action="store_true")
 parser.add_argument("--deadline", type=int, default=40)
-parser.add_argument("--module", type=str, default="GraphToFixed", choices=["HigaEtAl", "GraphToFixed", "GraphToGraph", "PureGCN", "FixedToFixed", "FixedToFixed2", "GraphToGraph2", "GraphToGraphLargeFixedAction", "Test"])
+parser.add_argument("--module", type=str, default="GraphToFixed", choices=["AttentionGraphToGraph2", "HigaEtAl", "GraphToFixed", "GraphToGraph", "PureGNN", "FixedToFixed", "FixedToFixed2", "GraphToGraph2", "GraphToGraphLargeFixedAction", "Test", "AttentionGraphToGraph"])
 # parser.add_argument("--rl_agent_class", type=str, default="RLAgentStackedObs", choices=["RLAgentStackedObs", "RLAgentGraphObs"])
 parser.add_argument("--reward_type", type=str, default="utility", choices=["utility", "utility_and_difference", "difference"])
 parser.add_argument("--entropy_coeff", type=float, default=0)
@@ -54,7 +51,9 @@ MODULES = {
     "GraphToFixed": GraphToFixed,
     "GraphToGraph": GraphToGraph,
     "GraphToGraph2": GraphToGraph2,
-    "PureGCN": PureGCN,
+    "AttentionGraphToGraph": AttentionGraphToGraph,
+    "AttentionGraphToGraph2": AttentionGraphToGraph2,
+    "PureGNN": PureGNN,
     "GraphToGraphLargeFixedAction": GraphToGraphLargeFixedAction,
     "Test": Test,
 }
@@ -131,6 +130,13 @@ if __name__ == "__main__":
         )
     )
 
+
+    # random_generator = default_rng(0)
+    
+    # if args.scenario == "environment/scenarios/random":
+    #     scenario = Scenario.create_random([100, 1000], random_generator, no_utility_functions=True)
+    #     scenario.to_directory(Path(args.scenario))
+
     algo = config.build()
 
     if args.wandb:
@@ -145,24 +151,24 @@ if __name__ == "__main__":
             config=config_dict,
         )
 
-    random_generator = default_rng(0)
-    timesteps_total = 0
+    # weights = None
     for i in range(args.training_iterations):
-        if i > 0:
-            if args.scenario == "environment/scenarios/random":
-                scenario = Scenario.create_random([100, 1000], random_generator, no_utility_functions=True)
-                scenario.to_directory(Path(args.scenario))
-                algo = config.build()
-                algo.set_weights(weights)
-                # algo.get_policy().action_space = MultiDiscrete([2] + [len(v) for v in scenario.objectives.values()])
-                # algo.get_policy().action_space_struct = MultiDiscrete([2] + [len(v) for v in scenario.objectives.values()])
+        # if i > 0:
+        #     if args.scenario == "environment/scenarios/random":
+        #         wandb.log({"scenario_size": scenario.size}, step=result["timesteps_total"])
+        #         scenario = Scenario.create_random([100, 1000], random_generator, no_utility_functions=True)
+        #         scenario.to_directory(Path(args.scenario))
+        #         algo = config.build()
+        #         algo.set_weights(weights)
+        #         algo.get_policy().action_space = MultiDiscrete([2] + [len(v) for v in scenario.objectives.values()])
+        #         algo.get_policy().action_space_struct = MultiDiscrete([2] + [len(v) for v in scenario.objectives.values()])
         result = algo.train()
         # policy = algo.get_policy()
-        weights = algo.get_weights()
+        # weights = algo.get_weights()
         # config = algo.get_config()
         # clean = algo.cleanup()
         print(f"Episode reward mean: {result['episode_reward_mean']:.4f}")
-        timesteps_total += result["agent_timesteps_total"]
+        # timesteps_total += result["agent_timesteps_total"]
         if args.wandb:
             wandb.log(
                 {
@@ -170,9 +176,9 @@ if __name__ == "__main__":
                     "episode_reward_mean": result["episode_reward_mean"],
                     "episode_reward_max": result["episode_reward_max"],
                 },
-                step=timesteps_total,
+                step=result["timesteps_total"],
             )
-            wandb.log(result["custom_metrics"], step=timesteps_total)
+            wandb.log(result["custom_metrics"], step=result["timesteps_total"])
 
     if args.wandb:
         wandb.finish()

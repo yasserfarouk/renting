@@ -1,7 +1,6 @@
 from collections import deque
 
 import numpy as np
-from gymnasium import spaces
 from gymnasium.spaces import Box, Dict, Discrete, MultiDiscrete
 
 from environment.deadline import Deadline
@@ -290,6 +289,109 @@ class RLAgentGraphObs(RLAgent):
                 dtype=np.float32,
             ),
             "edge_indices": self.edge_indices,
+            "opponent_encoding": opponent_encoding,
+            "accept_mask": accept_mask,
+        }
+        return obs
+
+    def get_first_action(self, last_actions: deque[dict]) -> dict:
+        if len(last_actions) == 1:
+            self.register_opp_action(last_actions[-1])
+        outcome = np.array(self.utility_function.max_utility_outcome, dtype=np.int64)
+        return {"agent_id": self.agent_id, "outcome": outcome, "accept": 0}
+
+    def register_opp_action(self, action: dict):
+        self.num_opp_actions += 1
+        self.counted_opp_outcomes[self.value_offset + action["outcome"]] += 1
+        self.fraction_opp_outcomes = self.counted_opp_outcomes / self.num_opp_actions
+
+
+class RLAgentGraphObs2(RLAgent):
+    def __init__(self, agent_id: str, utility_function: UtilityFunction, num_used_agents: int):
+        super().__init__(agent_id, utility_function, num_used_agents)
+
+        self.num_objectives = len(utility_function.objective_weights)
+        values_per_objective = [len(v) for v in utility_function.value_weights.values()]
+        objective_weights = [v for v in utility_function.objective_weights.values()]
+
+        num_edges = sum(values_per_objective)
+        self.observation_space = Dict(
+            {
+                "head_node": Box(np.array([0, 0]), np.array([np.inf, 1]), dtype=np.float32),
+                # #objectives, time (implicit num offers)
+                "objective_nodes": Box(np.array([[1, 0]] * self.num_objectives), np.array([[np.inf, 1]] * self.num_objectives), shape=(self.num_objectives, 2), dtype=np.float32),
+                # #values, weight,
+                "value_nodes": Box(0, 1, shape=(sum(values_per_objective), 4), dtype=np.float32),
+                # weight, average offered, my outcome, opp outcome
+                "edge_indices_val_obj": Box(np.array([[0] * num_edges, [0] * num_edges]), np.array([[num_edges - 1] * num_edges, [self.num_objectives - 1] * num_edges]), shape=(2, num_edges), dtype=np.int64),
+                "edge_indices_obj_head": Box(np.array([[0] * self.num_objectives, [0] * self.num_objectives]), np.array([[self.num_objectives - 1] * self.num_objectives, [0] * self.num_objectives]), shape=(2, self.num_objectives), dtype=np.int64),
+                "opponent_encoding": Discrete(num_used_agents),
+                "accept_mask": Box(0, 1, shape=(2,), dtype=bool),
+            }
+        )
+
+        self.value_offset = np.insert(np.cumsum(values_per_objective), 0, 0)[:-1]
+
+        self.edge_indices_val_obj = []
+        self.edge_indices_obj_head = []
+        start = 0
+        for i, n in enumerate(values_per_objective):
+            self.edge_indices_obj_head.append([i, 0])
+            for j in range(n):
+                self.edge_indices_val_obj.append([start + j, i])
+            start += j + 1
+
+        self.edge_indices_val_obj = np.array(self.edge_indices_val_obj, dtype=np.int64).T
+        self.edge_indices_obj_head = np.array(self.edge_indices_obj_head, dtype=np.int64).T
+
+        # total_nodes = 1 + self.num_objectives + sum(values_per_objective)
+        # self.adjacency = np.zeros((total_nodes, total_nodes), dtype=np.int64)
+        # self.adjacency[0, 1 : self.num_objectives + 1] = 1
+        # self.adjacency[1 : self.num_objectives + 1, 0] = 1
+
+        # start = self.num_objectives + 1
+        # for i, n in enumerate(values_per_objective):
+        #     self.adjacency[start : start + n, i + 1] = 1
+        #     self.adjacency[i + 1, start : start + n] = 1
+        #     start += n
+
+        self.value_weights = np.array([v2 for v1 in utility_function.value_weights.values() for v2 in v1.values()], dtype=np.float32)
+        self.counted_opp_outcomes = np.zeros_like(self.value_weights, dtype=np.float32)
+        self.fraction_opp_outcomes = np.zeros_like(self.value_weights, dtype=np.float32)
+
+
+        self.objective_nodes_features =  np.array([[v, o] for v, o in zip(values_per_objective, objective_weights)], dtype=np.float32)
+
+        self.num_opp_actions = 0
+
+    def get_observation(self, last_actions: deque[dict], deadline: Deadline, opponent_encoding) -> dict:
+        my_outcome = np.zeros_like(self.value_weights, dtype=np.float32)
+        opp_outcome = np.zeros_like(self.value_weights, dtype=np.float32)
+        accept_mask = np.ones(2, dtype=bool)
+
+        if len(last_actions) == 0:
+            accept_mask[1] = False
+        if len(last_actions) > 0:
+            self.register_opp_action(last_actions[-1])
+            opp_outcome[self.value_offset + last_actions[-1]["outcome"]] = 1
+        if len(last_actions) > 1:
+            my_outcome[self.value_offset + last_actions[-2]["outcome"]] = 1
+
+        obs = {
+            "head_node": np.array([self.num_objectives, deadline.get_progress()], dtype=np.float32),
+            "objective_nodes": self.objective_nodes_features,
+            "value_nodes": np.stack(
+                [
+                    self.value_weights,
+                    self.fraction_opp_outcomes,
+                    my_outcome,
+                    opp_outcome,
+                ],
+                axis=-1,
+                dtype=np.float32,
+            ),
+            "edge_indices_val_obj": self.edge_indices_val_obj,
+            "edge_indices_obj_head": self.edge_indices_obj_head,
             "opponent_encoding": opponent_encoding,
             "accept_mask": accept_mask,
         }
