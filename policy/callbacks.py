@@ -15,13 +15,31 @@ class InfoCallback(DefaultCallbacks):
         env_index: int,
         **kwargs,
     ):
-        opponent_utillity = episode.last_info_for("__common__")["opponent_utility"]
-        for opponent, utility in opponent_utillity.items():
-            episode.custom_metrics[opponent] = utility
+        utility_all_agents = episode.last_info_for("__common__")["utility_all_agents"]
+        for agent, utility in utility_all_agents.items():
+            episode.custom_metrics[agent] = utility
+
+    def on_algorithm_init(
+        self,
+        *,
+        algorithm,
+        **kwargs,
+    ) -> None:
+        """Callback run when a new Algorithm instance has finished setup.
+
+        This method gets called at the end of Algorithm.setup() after all
+        the initialization is done, and before actually training starts.
+
+        Args:
+            algorithm: Reference to the Algorithm instance.
+            kwargs: Forward compatibility placeholder.
+        """
+        pass
 
 
-    # def on_train_result(self, *, algorithm, result: dict, **kwargs):
-    #     # you can mutate the result dict to add new fields to return
+    def on_train_result(self, *, algorithm, result: dict, **kwargs):
+        # you can mutate the result dict to add new fields to return
+        pass
     #     result["callback_ok"] = True
 
     #     # Normally, RLlib would aggregate any custom metric into a mean, max and min

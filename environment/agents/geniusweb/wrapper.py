@@ -160,15 +160,15 @@ def geniusweb_wrapper(base):
 
         def _geniusweb_action_to_dict_action(self, action: Action) -> list:
             if isinstance(action, Offer):
-                action_dict = {"accept": np.int32(0)}
+                action_dict = {"accept": np.int64(0)}
             elif isinstance(action, Accept):
-                action_dict = {"accept": np.int32(1)}
+                action_dict = {"accept": np.int64(1)}
             else:
                 raise ValueError(f"Action {action} not supported")
 
             issue_values = action._bid._issuevalues
             outcome = [int(issue_values[str(i)]._value) for i in range(len(issue_values))]
-            action_dict["outcome"] = np.array(outcome, dtype=np.int32)
+            action_dict["outcome"] = np.array(outcome, dtype=np.int64)
             action_dict["agent_id"] = self.agent_id
 
             return action_dict
