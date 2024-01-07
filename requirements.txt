@@ -2,6 +2,7 @@ https://tracinsy.ewi.tudelft.nl/pubtrac/GeniusWebPython/export/100/geniuswebcore
 ray[rllib]==2.9.0
 torch
 torch_geometric
+torch-scatter
 pytest
 plotly
 scikit-learn
@@ -9,3 +10,4 @@ kaleido
 wandb
 gputil
 psutil
+-f https://data.pyg.org/whl/torch-2.1.0+cu121.html
