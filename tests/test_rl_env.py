@@ -9,7 +9,7 @@ DEADLINE = 20
 @pytest.fixture
 def env() -> NegotiationEnv:
     env_config = {
-        "agent_configs": ["RL", "BASIC.HardlinerAgent"],
+        "agents": ["RL_GraphToFixed", "BASIC_HardlinerAgent"],
         "used_agents": AGENTS.keys(),
         "scenario": "random",
         "deadline": {"rounds": DEADLINE, "ms": 10000},
@@ -22,24 +22,22 @@ def env() -> NegotiationEnv:
 
 def test_reset(env: NegotiationEnv):
     obs, _ = env.reset()
-    obs = next(iter(obs.values()))
     assert env.observation_space.contains(obs)
 
 
 def test_observation(env: NegotiationEnv):
     obs, _ = env.reset()
     agent_id = next(iter(obs.keys()))
-    outcome = np.array(env.agents[0].utility_function.max_utility_outcome, dtype=np.int32)
+    outcome = np.array(env.agents[0].utility_function.max_utility_outcome, dtype=np.int64)
     action = {"agent_id": agent_id, "outcome": outcome, "accept": 0}
     obs, rews, terminated, truncated, _ = env.step({agent_id: action})
-    obs = next(iter(obs.values()))
     assert env.observation_space.contains(obs)
 
 
 def test_deadline(env: NegotiationEnv):
     obs, _ = env.reset()
     agent_id = next(iter(obs.keys()))
-    outcome = np.array(env.agents[0].utility_function.max_utility_outcome, dtype=np.int32)
+    outcome = np.array(env.agents[0].utility_function.max_utility_outcome, dtype=np.int64)
     max_action = {"agent_id": agent_id, "outcome": outcome, "accept": 0}
     for i in range(1, DEADLINE):
         assert env.deadline.round == i

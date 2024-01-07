@@ -75,8 +75,7 @@ class Scenario:
     def __init__(
         self,
         objectives: dict,
-        utility_function_A: UtilityFunction,
-        utility_function_B: UtilityFunction,
+        utility_functions: list[UtilityFunction] = None,
         SW_outcome=None,
         nash_outcome=None,
         kalai_outcome=None,
@@ -85,9 +84,9 @@ class Scenario:
         opposition=None,
         visualisation=None,
     ):
+        assert not utility_functions or len(utility_functions) == 2 #NOTE: Force 2 sides for now
         self.objectives = objectives
-        self.utility_function_A = utility_function_A
-        self.utility_function_B = utility_function_B
+        self.utility_functions = utility_functions
         self.SW_outcome = SW_outcome
         self.nash_outcome = nash_outcome
         self.kalai_outcome = kalai_outcome
@@ -97,7 +96,7 @@ class Scenario:
         self.visualisation = visualisation
 
     @classmethod
-    def create_random(cls, size, np_random: Generator):
+    def create_random(cls, size, np_random: Generator, max_values: int = 20, no_utility_functions=False):
         if isinstance(size, int):
             size = size
         elif isinstance(size, list):
@@ -109,16 +108,18 @@ class Scenario:
             num_objectives = np_random.integers(3, 10)
             spread = np_random.dirichlet([1] * num_objectives)
             multiplier = (size / np.prod(spread)) ** (1.0 / num_objectives)
-            values_per_objective = np.round(multiplier * spread).astype(np.int32)
-            values_per_objective = np.clip(values_per_objective, 2, None)
+            values_per_objective = np.round(multiplier * spread).astype(np.int64)
+            values_per_objective = np.clip(values_per_objective, 2, max_values)
             if (abs(size - np.prod(values_per_objective)) < (0.1 * size)) and values_per_objective.sum() < 1000:
                 break
 
         objectives = {i: [v for v in range(vs)] for i, vs in enumerate(values_per_objective)}
 
-        utility_function_A = UtilityFunction.create_random(objectives, np_random)
-        utility_function_B = UtilityFunction.create_random(objectives, np_random)
-        return cls(objectives, utility_function_A, utility_function_B)
+        if no_utility_functions:
+            return cls(objectives)
+
+        utility_functions = [UtilityFunction.create_random(objectives, np_random) for _ in range(2)]
+        return cls(objectives, utility_functions)
 
     @classmethod
     def from_directory(cls, directory: Path, np_random=default_rng()):
@@ -126,20 +127,17 @@ class Scenario:
             objectives = {int(k): v for k, v in json.load(f).items()}
 
         if (directory / "utility_function_A.json").exists():
-            utility_function_A = UtilityFunction.from_file(
-                directory / "utility_function_A.json"
-            )
-            utility_function_B = UtilityFunction.from_file(
-                directory / "utility_function_B.json"
-            )
+            utility_functions = [
+                UtilityFunction.from_file(directory / "utility_function_A.json"),
+                UtilityFunction.from_file(directory / "utility_function_B.json"),
+            ]
             specials_path = directory / "specials.json"
             if specials_path.exists():
                 with open(specials_path, "r") as f:
                     specials = json.load(f)
                 return cls(
                     objectives,
-                    utility_function_A,
-                    utility_function_B,
+                    utility_functions,
                     SW_outcome=specials["social_welfare"],
                     nash_outcome=specials["nash"],
                     kalai_outcome=specials["kalai"],
@@ -148,11 +146,10 @@ class Scenario:
                     opposition=specials["opposition"],
                 )
         else:
-            utility_function_A = UtilityFunction.create_random(objectives, np_random)
-            utility_function_B = UtilityFunction.create_random(objectives, np_random)
+            utility_functions = [UtilityFunction.create_random(objectives, np_random) for _ in range(2)]
 
 
-        return cls(objectives, utility_function_A, utility_function_B)
+        return cls(objectives, utility_functions)
 
     def calculate_specials(self):
         if self.nash_outcome:
@@ -165,16 +162,16 @@ class Scenario:
         kalai_diff = 10
 
         for pareto_outcome in self.pareto_front:
-            utility_function_A, utility_B = pareto_outcome["utility"][0], pareto_outcome["utility"][1]
+            utility_A, utility_B = pareto_outcome["utility"][0], pareto_outcome["utility"][1]
 
-            utility_diff = abs(utility_function_A - utility_B)
-            utility_prod = utility_function_A * utility_B
-            utility_sum = utility_function_A + utility_B
+            utility_diff = abs(utility_A - utility_B)
+            utility_prod = utility_A * utility_B
+            utility_sum = utility_A + utility_B
 
             if utility_diff < kalai_diff:
                 self.kalai_outcome = pareto_outcome
                 kalai_diff = utility_diff
-                self.opposition = sqrt((utility_function_A - 1.0) ** 2 + (utility_B - 1.0) ** 2)
+                self.opposition = sqrt((utility_A - 1.0) ** 2 + (utility_B - 1.0) ** 2)
             if utility_prod > nash_utility:
                 self.nash_outcome = pareto_outcome
                 nash_utility = utility_prod
@@ -255,7 +252,7 @@ class Scenario:
 
         fig.update_layout(
             title=dict(
-                text=f"<sub>(size: {len(list(self.iter_outcomes()))}, opposition: {self.opposition:.4f}, distribution: {self.distribution:.4f})</sub>",
+                text=f"<sub>(size: {self.size}, opposition: {self.opposition:.4f}, distribution: {self.distribution:.4f})</sub>",
                 x=0.5,
                 xanchor="center",
             )
@@ -270,8 +267,10 @@ class Scenario:
 
         with open(directory / "objectives.json", "w") as f:
             f.write(json.dumps(self.objectives, indent=2))
-        self.utility_function_A.to_file(directory / "utility_function_A.json")
-        self.utility_function_B.to_file(directory / "utility_function_B.json")
+
+        if self.utility_functions:
+            self.utility_functions[0].to_file(directory / "utility_function_A.json")
+            self.utility_functions[1].to_file(directory / "utility_function_B.json")
 
         if self.nash_outcome:
             with open(directory / "specials.json", "w") as f:
@@ -297,7 +296,7 @@ class Scenario:
         return iter(self)
 
     def get_utilities(self, outcome):
-        return self.utility_function_A.get_utility(outcome), self.utility_function_B.get_utility(outcome)
+        return [uf.get_utility(outcome) for uf in self.utility_functions]
 
     def get_pareto(self, all_outcomes: list):
         pareto_front = []
@@ -324,10 +323,7 @@ class Scenario:
                 pareto_front.append(
                     {
                         "outcome": candidate_outcome,
-                        "utility": [
-                            self.utility_function_A.get_utility(candidate_outcome),
-                            self.utility_function_B.get_utility(candidate_outcome),
-                        ],
+                        "utility": self.get_utilities(candidate_outcome)
                     }
                 )
 
@@ -350,11 +346,11 @@ class Scenario:
         return distribution
 
     def _dominates(self, outcome, candidate_outcome):
-        if self.utility_function_A.get_utility(outcome) < self.utility_function_A.get_utility(candidate_outcome):
+        utilities = self.get_utilities(outcome)
+        utilities_candidate = self.get_utilities(candidate_outcome)
+        if utilities[0] < utilities_candidate[0]:
             return False
-        elif self.utility_function_B.get_utility(outcome) < self.utility_function_B.get_utility(
-            candidate_outcome
-        ):
+        elif utilities[1] < utilities_candidate[1]:
             return False
         else:
             return True
@@ -382,15 +378,21 @@ class Scenario:
         Returns:
             float: Euclidian distance
         """
+        utilities1 = self.get_utilities(outcome1)
         if outcome2 and outcome1:
-            a = (self.utility_function_A.get_utility(outcome1) - self.utility_function_A.get_utility(outcome2)) ** 2
-            b = (self.utility_function_B.get_utility(outcome1) - self.utility_function_B.get_utility(outcome2)) ** 2
+            utilities2 = self.get_utilities(outcome2)
+            a = (utilities1[0] - utilities2[0]) ** 2
+            b = (utilities1[1] - utilities2[1]) ** 2
         elif outcome1:
-            a = self.utility_function_A.get_utility(outcome1) ** 2
-            b = self.utility_function_B.get_utility(outcome1) ** 2
+            a = utilities1[0] ** 2
+            b = utilities1[1] ** 2
         else:
             raise ValueError("receive None outcome")
         return math.sqrt(a + b)
+
+    @property
+    def size(self):
+        return math.prod(len(v) for v in self.objectives.values())
 
     def __iter__(self) -> tuple:
         outcomes_values = product(*self.objectives.values())

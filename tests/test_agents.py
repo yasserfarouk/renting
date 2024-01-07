@@ -12,13 +12,13 @@ from environment.scenario import Scenario
 @pytest.mark.parametrize("agent_class", AGENTS.values())
 def test_initialisation(agent_class):
     scenario = Scenario.create_random(400, default_rng())
-    agent_class("test", scenario.utility_function_A, Deadline(10000), {})
+    agent_class("test", scenario.utility_functions[0], Deadline(10000), {})
 
 
 @pytest.mark.parametrize("agent_class", AGENTS.values())
 def test_opening_bid(agent_class):
     scenario = Scenario.create_random(400, default_rng())
-    agent = agent_class("test", scenario.utility_function_A, Deadline(10000), {})
+    agent = agent_class("test", scenario.utility_functions[0], Deadline(10000), {})
     last_actions = deque()
     agent.select_action(last_actions)
 
@@ -27,7 +27,7 @@ def test_opening_bid(agent_class):
 def test_accept_first_offer(agent_class):
     last_actions = deque()
     scenario = Scenario.create_random(400, default_rng())
-    agent = agent_class("test", scenario.utility_function_A, Deadline(10000), {})
+    agent = agent_class("test", scenario.utility_functions[0], Deadline(10000), {})
     last_actions = deque()
     action, _ = agent.select_action(last_actions)
     assert isinstance(action, dict)
@@ -42,10 +42,10 @@ def test_accept_first_offer(agent_class):
 @pytest.mark.parametrize("agent_class", AGENTS.values())
 def test_round_deadline(agent_class):
     scenario = Scenario.create_random(400, default_rng())
-    outcome = np.array(scenario.utility_function_B.max_utility_outcome, dtype=np.int32)
+    outcome = np.array(scenario.utility_functions[1].max_utility_outcome, dtype=np.int64)
     last_actions = deque()
     bid = {"agent_id": "opponent", "outcome": outcome, "accept": 0}
-    agent = agent_class("test", scenario.utility_function_A, Deadline(10000, 10), {})
+    agent = agent_class("test", scenario.utility_functions[0], Deadline(10000, 10), {})
     for i in range(9):
         agent.select_action(last_actions)
         if i == 0:
