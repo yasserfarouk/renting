@@ -422,6 +422,8 @@ class HigaEtAl(RLAgent):
             }
         )
 
+        self.offer_max_first = True
+
     def get_observation(self, last_actions: deque[dict], deadline: Deadline, opponent_encoding) -> dict:
         obs = {
             "self_bid": last_actions[-2]["outcome"],

@@ -14,7 +14,6 @@ def env() -> NegotiationEnv:
         "scenario": "random",
         "deadline": {"rounds": DEADLINE, "ms": 10000},
         "random_agent_order": False,
-        "offer_max_first": True,
     }
     env = NegotiationEnv(env_config)
     return env

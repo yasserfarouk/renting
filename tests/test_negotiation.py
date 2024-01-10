@@ -12,7 +12,6 @@ def env() -> NegotiationEnv:
         "scenario": "random",
         "deadline": {"rounds": 20, "ms": 10000},
         "random_agent_order": True,
-        "offer_max_first": True,
     }
     env = NegotiationEnv(env_config)
     return env
@@ -33,7 +32,6 @@ def test_load_scenario():
         "scenario": "environment/scenarios/scenario_0000",
         "deadline": {"rounds": 20, "ms": 10000},
         "random_agent_order": False,
-        "offer_max_first": True,
     }
     env = NegotiationEnv(env_config)
     env.reset()

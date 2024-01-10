@@ -116,7 +116,7 @@ class NegotiationEnv(MultiAgentEnv):
             self.current_agent = next(self.agents_iter)
             
             if isinstance(self.current_agent, RLAgent):
-                if self.env_config["offer_max_first"] and len(self.last_actions) < 2:
+                if hasattr(self.current_agent, "offer_max_first") and self.current_agent.offer_max_first and len(self.last_actions) < 2:
                     action = self.current_agent.get_first_action(self.last_actions)
                 else:
                     obs = self.current_agent.get_observation(self.last_actions, self.deadline, self.opponent_encoding)
