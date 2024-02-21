@@ -1,8 +1,12 @@
 https://tracinsy.ewi.tudelft.nl/pubtrac/GeniusWebPython/export/100/geniuswebcore/dist/geniusweb-1.2.1.tar.gz
-ray[rllib]==2.9.0
+ray[rllib]
 torch
+torchvision
 torch_geometric
 torch-scatter
+tensorboard
+torch-tb-profiler
+tensordict
 pytest
 plotly
 scikit-learn
@@ -10,4 +14,10 @@ kaleido
 wandb
 gputil
 psutil
--f https://data.pyg.org/whl/torch-2.1.0+cu121.html
+gymnasium
+pettingzoo
+cloudpickle
+supersuit
+tyro
+pandas
+-f https://data.pyg.org/whl/torch-2.2.0+cu121.html
