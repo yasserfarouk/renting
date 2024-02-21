@@ -4,7 +4,10 @@
 __pycache__
 
 tests/test_scenarios
-environment/scenarios
+
+environment/scenarios/*
+!fixed_utility
+!random_utility
 
 output
 wandb

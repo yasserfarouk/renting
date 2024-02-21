@@ -1,5 +1,6 @@
 from typing import Any, Mapping
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from gymnasium import spaces
@@ -14,12 +15,11 @@ from ray.rllib.models.torch.torch_distributions import (
 from ray.rllib.utils.annotations import override
 from ray.rllib.utils.nested_dict import NestedDict
 from torch import Tensor, nn
-from torch_geometric.nn import GCNConv, GAT, GATv2Conv
-from torch_scatter import scatter
-
-from policy.custom_layers import DirectedGraphAttention
+from torch.distributions import Categorical
+from torch.distributions.distribution import Distribution
+from torch.distributions.kl import kl_divergence
+from torch_geometric.nn import GAT, GATv2Conv
 from torch_scatter import scatter, scatter_softmax
-from torch_geometric.data import Batch, Data
 
 
 class BaseModel(TorchRLModule, PPORLModule):
@@ -952,3 +952,249 @@ class FixedToFixed2(BaseModel):
         action_logits = self.pi(H)
 
         return {"vf_preds": vf_out, "action_dist_inputs": action_logits}
+
+
+def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
+    torch.nn.init.orthogonal_(layer.weight, std)
+    torch.nn.init.constant_(layer.bias, bias_const)
+    return layer
+
+class AttentionGraphToGraph3(nn.Module):
+
+    def __init__(self, envs, args):
+        super().__init__()
+        self.use_opponent_encoding = args.use_opponent_encoding
+        self.num_used_agents = envs.single_observation_space["opponent_encoding"].n
+
+        head_features = 2 + self.num_used_agents if args.use_opponent_encoding else 2
+
+        self.val_obj = GATv2Conv((4, 2), args.hidden_size)
+        self.obj_head = GATv2Conv((args.hidden_size, head_features), args.hidden_size)
+        self.head_obj = GATv2Conv((args.hidden_size, args.hidden_size), args.hidden_size)
+        self.obj_val = GATv2Conv((args.hidden_size, 4), 1)
+
+        self.accept_head = layer_init(nn.Linear(args.hidden_size, 2), std=0.01)
+        self.vf = layer_init(nn.Linear(args.hidden_size, 1), std=1)
+
+        self.action_nvec = tuple(envs.single_action_space.nvec)
+
+    def get_value(self, batch):
+        head_node: Tensor = batch["head_node"]
+        objective_nodes: Tensor = batch["objective_nodes"]
+        value_nodes: Tensor = batch["value_nodes"]
+        edge_indices_val_obj: Tensor = batch["edge_indices_val_obj"]
+        edge_indices_obj_head: Tensor = batch["edge_indices_obj_head"]
+        opponent_encoding: Tensor = F.one_hot(batch["opponent_encoding"], self.num_used_agents)
+
+        if self.use_opponent_encoding:
+            head_node = torch.cat((head_node, opponent_encoding), dim=-1)
+
+        h_head_out = []
+        for vn, ob, hn, eivo, eioh in zip(value_nodes, objective_nodes, head_node, edge_indices_val_obj, edge_indices_obj_head):
+            h_obj = F.relu(self.val_obj((vn, ob), eivo))
+            h_head = F.relu(self.obj_head((h_obj, hn), eioh))
+            h_head_out.append(h_head)
+
+        h_head_out = torch.cat(h_head_out, dim=0)
+        vf_out = self.vf(h_head_out).squeeze(-1)
+
+        return vf_out
+
+    def get_action_and_value(self, batch, action=None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        head_node: Tensor = batch["head_node"]
+        objective_nodes: Tensor = batch["objective_nodes"]
+        value_nodes: Tensor = batch["value_nodes"]
+        edge_indices_val_obj: Tensor = batch["edge_indices_val_obj"]
+        edge_indices_obj_head: Tensor = batch["edge_indices_obj_head"]
+        opponent_encoding: Tensor = F.one_hot(batch["opponent_encoding"], self.num_used_agents)
+        accept_mask: Tensor = batch["accept_mask"]
+
+        if self.use_opponent_encoding:
+            head_node = torch.cat((head_node, opponent_encoding), dim=-1)
+
+        offer_action_logits = []
+        h_head_out = []
+        for vn, ob, hn, eivo, eioh in zip(value_nodes, objective_nodes, head_node, edge_indices_val_obj, edge_indices_obj_head):
+            h_obj = F.relu(self.val_obj((vn, ob), eivo))
+            h_head = F.relu(self.obj_head((h_obj, hn), eioh))
+            h_obj = F.relu(self.head_obj((h_head, h_obj), eioh.flip(0)))
+            offer_action_logits.append(self.obj_val((h_obj, vn), eivo.flip(0)).squeeze(-1).unsqueeze(0))
+            h_head_out.append(h_head)
+
+        offer_action_logits = torch.cat(offer_action_logits, dim=0)
+        h_head_out = torch.cat(h_head_out, dim=0)
+        # head node to accept action
+        accept_inf_mask = torch.max(torch.log(accept_mask), torch.Tensor([torch.finfo(torch.float32).min]).to("cuda:0" if torch.cuda.is_available() else "cpu"))
+        accept_action_logits = self.accept_head(h_head_out) + accept_inf_mask
+
+        # head node to value function
+        vf_out = self.vf(h_head_out).squeeze(-1)
+
+        # gather action logits
+        action_logits = torch.cat((accept_action_logits, offer_action_logits), dim=-1)
+
+        probs = MultiCategorical(action_logits, self.action_nvec)
+
+        if action is None:
+            action = probs.sample()
+        return action, probs.log_prob(action), probs.entropy(), vf_out
+
+
+class PureGNN2(nn.Module):
+    def __init__(self, envs, args):
+        super().__init__()
+        self.use_opponent_encoding = args.use_opponent_encoding
+        self.num_used_agents = envs.single_observation_space["opponent_encoding"].n
+
+        head_features = 2 + self.num_used_agents if self.use_opponent_encoding else 2
+
+        hidden_size = args.hidden_size
+
+        self.head_encoder = layer_init(nn.Linear(head_features, hidden_size))
+        self.objective_encoder = layer_init(nn.Linear(2, hidden_size))
+        self.value_encoder = layer_init(nn.Linear(4, hidden_size))
+
+        self.gnn_layers = GAT(hidden_size, hidden_size, 4, hidden_size, v2=True)
+        # self.skip_connects = [nn.Linear(2 * hidden_size, hidden_size) for _ in range(self.config.model_config_dict["num_gcn_layers"])]
+
+        self.accept_head = layer_init(nn.Linear(hidden_size, 2), std=0.01)
+        self.offer_head = layer_init(nn.Linear(hidden_size, 1), std=0.01)
+        self.vf = layer_init(nn.Linear(hidden_size, 1), std=1)
+
+        self.action_nvec = tuple(envs.single_action_space.nvec)
+
+
+    def get_value(self, batch):
+        head_node: Tensor = batch["head_node"]
+        objective_nodes: Tensor = batch["objective_nodes"]
+        value_nodes: Tensor = batch["value_nodes"]
+        edge_indices: Tensor = batch["edge_indices"]
+        opponent_encoding: Tensor = F.one_hot(batch["opponent_encoding"], self.num_used_agents)
+
+        if self.use_opponent_encoding:
+            head_node = torch.cat((head_node, opponent_encoding), dim=-1)
+
+        h_head_node = F.relu(self.head_encoder(head_node))
+        h_objective_nodes = F.relu(self.objective_encoder(objective_nodes))
+        h_value_nodes = F.relu(self.value_encoder(value_nodes))
+
+        h_nodes = torch.cat((h_head_node.unsqueeze(1), h_objective_nodes, h_value_nodes), dim=1)
+
+        h_nodes = torch.cat([F.relu(self.gnn_layers(h, e)).unsqueeze(0) for h, e in zip(h_nodes, edge_indices)], dim=0)
+
+        vf_out = self.vf(h_nodes[:, 0, :]).squeeze(-1)
+
+        return vf_out
+    
+    def get_action_and_value(self, batch, action=None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        head_node: Tensor = batch["head_node"]
+        objective_nodes: Tensor = batch["objective_nodes"]
+        value_nodes: Tensor = batch["value_nodes"]
+        edge_indices: Tensor = batch["edge_indices"]
+        opponent_encoding: Tensor = F.one_hot(batch["opponent_encoding"], self.num_used_agents)
+        accept_mask: Tensor = batch["accept_mask"]
+
+        if self.use_opponent_encoding:
+            head_node = torch.cat((head_node, opponent_encoding), dim=-1)
+
+        h_head_node = F.relu(self.head_encoder(head_node))
+        h_objective_nodes = F.relu(self.objective_encoder(objective_nodes))
+        h_value_nodes = F.relu(self.value_encoder(value_nodes))
+
+        h_nodes = torch.cat((h_head_node.unsqueeze(1), h_objective_nodes, h_value_nodes), dim=1)
+        h_nodes = torch.cat([F.relu(self.gnn_layers(h, e)).unsqueeze(0) for h, e in zip(h_nodes, edge_indices)], dim=0)
+
+
+        h_value_nodes_out = h_nodes[:, -value_nodes.shape[1]:, :]
+        offer_action_logits = self.offer_head(h_value_nodes_out).squeeze(-1)
+
+        accept_inf_mask = torch.max(torch.log(accept_mask), torch.Tensor([torch.finfo(torch.float32).min]).to("cuda:0" if torch.cuda.is_available() else "cpu"))
+        accept_action_logits = self.accept_head(h_nodes[:, 0, :]) + accept_inf_mask
+
+        # head node to value function
+        vf_out = self.vf(h_nodes[:, 0, :]).squeeze(-1)
+
+        # gather action logits
+        action_logits = torch.cat((accept_action_logits, offer_action_logits), dim=-1)
+
+        probs = MultiCategorical(action_logits, self.action_nvec)
+
+        if action is None:
+            action = probs.sample()
+        return action, probs.log_prob(action), probs.entropy(), vf_out
+
+
+class FixedToFixed3(nn.Module):
+    def __init__(self, envs, args):
+        super().__init__()
+        assert not args.use_opponent_encoding
+        self.action_nvec = tuple(envs.single_action_space.nvec)
+
+        self.encoder = nn.Sequential(
+            nn.Linear(spaces.flatdim(envs.single_observation_space), args.hidden_size),
+            nn.ReLU(),
+            nn.Linear(args.hidden_size, args.hidden_size),
+            nn.ReLU(),
+            nn.Linear(args.hidden_size, args.hidden_size),
+            nn.ReLU()
+        )
+
+        self.vf = nn.Linear(args.hidden_size, 1)
+        self.pi = nn.Linear(args.hidden_size, sum(self.action_nvec))
+
+    def get_value(self, batch):
+        self_bid: Tensor = batch["self_bid"]
+        opponent_bid: Tensor = batch["opponent_bid"]
+        time: Tensor = batch["time"]
+        X = torch.cat((self_bid, opponent_bid, time), dim=-1)
+
+        H = self.encoder(X)
+        vf_out = self.vf(H)
+
+        return vf_out
+    
+    def get_action_and_value(self, batch, action=None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        self_bid: Tensor = batch["self_bid"]
+        opponent_bid: Tensor = batch["opponent_bid"]
+        time: Tensor = batch["time"]
+        X = torch.cat((self_bid, opponent_bid, time), dim=-1)
+
+        H = self.encoder(X)
+        vf_out = self.vf(H)
+
+        # gather action logits
+        action_logits = self.pi(H)
+
+        probs = MultiCategorical(action_logits, self.action_nvec)
+
+        if action is None:
+            action = probs.sample()
+        return action, probs.log_prob(action), probs.entropy(), vf_out
+
+    
+class MultiCategorical(Distribution):
+    def __init__(self, multi_logits, nvec, validate_args=None):
+        self.cats = [
+            Categorical(logits=logits)
+            for logits in torch.split(multi_logits, nvec, dim=-1)
+        ]
+        batch_shape = multi_logits.size()[:-1]
+        super().__init__(batch_shape, validate_args=validate_args)
+
+    def sample(self) -> Tensor:
+        return torch.stack([cat.sample() for cat in self.cats], dim=-1)
+
+    def log_prob(self, value: Tensor) -> Tensor:
+        value = torch.unbind(value, dim=-1)
+        logps = torch.stack([cat.log_prob(act) for cat, act in zip(self.cats, value)])
+        return torch.sum(logps, dim=0)
+
+    def entropy(self) -> Tensor:
+        return torch.stack([cat.entropy() for cat in self.cats], dim=-1).sum(dim=-1)
+    
+    def kl(self, other):
+        kls = torch.stack(
+            [kl_divergence(cat, oth_cat) for cat, oth_cat in zip(self.cats, other.cats)],
+            dim=-1,
+        )
+        return torch.sum(kls, dim=-1)
