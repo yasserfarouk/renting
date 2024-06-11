@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-
+import torch
 import ray
 from numpy.random import default_rng
 from ray.rllib.algorithms.ppo import PPOConfig
@@ -12,9 +12,8 @@ import wandb
 from environment.agents.geniusweb import AGENTS
 from environment.negotiation import NegotiationEnv
 from environment.scenario import Scenario
-from policy.callbacks import InfoCallback
-from policy.learner import CustomPPOTorchLearner
-from policy.PPO import (FixedToFixed, FixedToFixed2, GraphToFixed, AttentionGraphToGraph,
+from environment.agents.policy.callbacks import InfoCallback
+from environment.agents.policy.PPO import (FixedToFixed, FixedToFixed2, GraphToFixed, AttentionGraphToGraph,
                         GraphToGraph, GraphToGraph2, AttentionGraphToGraph2,
                         GraphToGraphLargeFixedAction, HigaEtAl, PureGNN, Test)
 
@@ -36,13 +35,12 @@ parser.add_argument("--num_sgd_iter", type=int, default=30)
 parser.add_argument("--pooling_op", type=str, default="max", choices=["sum", "mean", "max", "mul", "min"])
 parser.add_argument("--hidden_size", type=int, default=32)
 parser.add_argument("--num_gcn_layers", type=int, default=2)
-parser.add_argument("--training_iterations", type=int, default=1000)
+parser.add_argument("--timesteps_total", type=int, default=4000000)
 parser.add_argument("--opponent", type=str, default="random")
 parser.add_argument("--use_opponent_encoding", action="store_true")
 parser.add_argument("--opponent_sets", nargs="+", type=str, default=["ANL2022","ANL2023","CSE3210"])
 parser.add_argument("--scenario", type=str, default="environment/scenarios/random_utility")
 parser.add_argument("--random_agent_order", action="store_true")
-parser.add_argument("--offer_max_first", action="store_true")
 
 MODULES = {
     "HigaEtAl": HigaEtAl,
@@ -70,7 +68,6 @@ if __name__ == "__main__":
         "scenario": args.scenario,
         "deadline": {"rounds": args.deadline, "ms": 10000},
         "random_agent_order": args.random_agent_order,
-        "offer_max_first": args.offer_max_first,
     }
     if args.opponent == "all":
         if len(used_agents) > 30:
@@ -115,7 +112,7 @@ if __name__ == "__main__":
             batch_mode="complete_episodes",
         )
         .fault_tolerance(recreate_failed_workers=True)
-        .resources(num_gpus=0, num_cpus_per_worker=1)
+        .resources(num_gpus=1 if torch.cuda.is_available() else 0, num_cpus_per_worker=1)
         .callbacks(InfoCallback)
         .training(
             grad_clip=args.grad_clip,
@@ -126,7 +123,6 @@ if __name__ == "__main__":
             train_batch_size=args.train_batch_size if not args.debug else 100,
             sgd_minibatch_size=args.sgd_minibatch_size if not args.debug else 20,
             num_sgd_iter=args.num_sgd_iter if not args.debug else 5,
-            learner_class=CustomPPOTorchLearner,
         )
     )
 
@@ -151,8 +147,8 @@ if __name__ == "__main__":
             config=config_dict,
         )
 
-    # weights = None
-    for i in range(args.training_iterations):
+    result = {"timesteps_total": 0}
+    while result["timesteps_total"] < args.timesteps_total:
         # if i > 0:
         #     if args.scenario == "environment/scenarios/random":
         #         wandb.log({"scenario_size": scenario.size}, step=result["timesteps_total"])
@@ -179,6 +175,7 @@ if __name__ == "__main__":
                 step=result["timesteps_total"],
             )
             wandb.log(result["custom_metrics"], step=result["timesteps_total"])
+            wandb.log(result["info"]["learner"]["default_policy"], step=result["timesteps_total"])
 
     if args.wandb:
         wandb.finish()
