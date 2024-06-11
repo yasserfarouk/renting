@@ -277,7 +277,7 @@ class Scenario:
                 f.write(
                     json.dumps(
                         {
-                            "size": len(list(self.iter_outcomes())),
+                            "size": self.size,
                             "opposition": self.opposition,
                             "distribution": self.distribution,
                             "social_welfare": self.SW_outcome,
