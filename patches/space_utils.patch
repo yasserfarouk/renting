@@ -2,14 +2,16 @@
 < from gymnasium.spaces import Tuple, Dict
 ---
 > from gymnasium.spaces import Tuple, Dict, Sequence
-89a90,91
+89a90,93
 >         elif isinstance(space_, Sequence):
->             return tuple([_helper_struct(space_.feature_space)] * space_.sample().shape[0])
-133c135
+>             if space_.stack:
+>                 return batch_space(space_.feature_space, n=space_.sample().shape[0])
+>             return tuple([_helper_struct(space_.feature_space)] * len(space_.sample()))
+133c137
 <     if isinstance(space, (gym.spaces.Dict, gym.spaces.Tuple, dict, tuple)):
 ---
 >     if isinstance(space, (gym.spaces.Dict, gym.spaces.Tuple, gym.spaces.Sequence, dict, tuple)):
-135c137
+135c139
 <         if isinstance(space, (gym.spaces.Dict, gym.spaces.Tuple)):
 ---
 >         if isinstance(space, (gym.spaces.Dict, gym.spaces.Tuple, gym.spaces.Sequence)):
