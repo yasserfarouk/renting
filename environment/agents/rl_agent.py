@@ -1,7 +1,7 @@
 from collections import deque
 
 import numpy as np
-from gymnasium.spaces import Box, Dict, Discrete, MultiDiscrete
+from gymnasium.spaces import Box, Dict, Discrete, MultiDiscrete, Graph, GraphInstance
 
 from environment.deadline import Deadline
 from environment.scenario import UtilityFunction
@@ -398,7 +398,7 @@ class RLAgentGraphObs2(RLAgent):
         num_edges = sum(values_per_objective)
         observation_space = Dict(
             {
-                "head_node": Box(np.array([0, 0]), np.array([np.inf, 1]), dtype=np.float32),
+                "head_node": Box(np.array([[0, 0]]), np.array([[np.inf, 1]]), dtype=np.float32),
                 # #objectives, time (implicit num offers)
                 "objective_nodes": Box(np.array([[1, 0]] * num_objectives), np.array([[np.inf, 1]] * num_objectives), shape=(num_objectives, 2), dtype=np.float32),
                 # #values, weight,
@@ -432,7 +432,7 @@ class RLAgentGraphObs2(RLAgent):
             my_outcome[self.value_offset + last_actions[-2]["outcome"]] = 1
 
         obs = {
-            "head_node": np.array([self.num_objectives, deadline.get_progress()], dtype=np.float32),
+            "head_node": np.array([[self.num_objectives, deadline.get_progress()]], dtype=np.float32),
             "objective_nodes": self.objective_nodes_features,
             "value_nodes": np.stack(
                 [
@@ -489,11 +489,14 @@ class RLAgentGraphObs3(RLAgent):
 
         self.value_weights = np.array([v2 for v1 in utility_function.value_weights.values() for v2 in v1.values()], dtype=np.float32)
         self.counted_opp_outcomes = np.zeros_like(self.value_weights, dtype=np.float32)
+        self.counted_my_outcomes = np.zeros_like(self.value_weights, dtype=np.float32)
         self.fraction_opp_outcomes = np.zeros_like(self.value_weights, dtype=np.float32)
+        self.fraction_my_outcomes = np.zeros_like(self.value_weights, dtype=np.float32)
 
         self.objective_nodes_features =  np.array([[v, o] for v, o in zip(values_per_objective, objective_weights)], dtype=np.float32)
 
         self.num_opp_actions = 0
+        self.num_my_actions = 0
 
     @staticmethod
     def observation_space(utility_function, num_used_agents):
@@ -507,10 +510,102 @@ class RLAgentGraphObs3(RLAgent):
                 # #objectives, time (implicit num offers)
                 "objective_nodes": Box(np.array([[1, 0]] * num_objectives), np.array([[np.inf, 1]] * num_objectives), shape=(num_objectives, 2), dtype=np.float32),
                 # #values, weight,
-                "value_nodes": Box(0, 1, shape=(sum(values_per_objective), 4), dtype=np.float32),
+                "value_nodes": Box(0, 1, shape=(sum(values_per_objective), 5), dtype=np.float32),
                 # weight, average offered, my outcome, opp outcome
                 "edge_indices": Box(0, np.inf, shape=(2, num_edges), dtype=np.int64),
                 "opponent_encoding": Discrete(num_used_agents),
+                "accept_mask": Box(0, 1, shape=(2,), dtype=bool),
+            }
+        )
+        return observation_space
+
+    @staticmethod
+    def action_space(utility_function):
+        values_per_objective = [len(v) for v in utility_function.value_weights.values()]
+        action_space = MultiDiscrete([2] + values_per_objective, dtype=np.int64)
+        return action_space
+
+    def get_observation(self, last_actions: deque[dict], deadline: Deadline, opponent_encoding) -> dict:
+        my_outcome = np.zeros_like(self.value_weights, dtype=np.float32)
+        opp_outcome = np.zeros_like(self.value_weights, dtype=np.float32)
+        accept_mask = np.ones(2, dtype=bool)
+
+        if len(last_actions) == 0:# or deadline.get_progress() <= 0.95:
+            accept_mask[1] = False
+        if len(last_actions) > 0:
+            self.register_opp_action(last_actions[-1])
+            opp_outcome[self.value_offset + last_actions[-1]["outcome"]] = 1
+        if len(last_actions) > 1:
+            self.register_my_action(last_actions[-2])
+            my_outcome[self.value_offset + last_actions[-2]["outcome"]] = 1
+
+        obs = {
+            "head_node": np.array([self.num_objectives, deadline.get_progress()], dtype=np.float32),
+            "objective_nodes": self.objective_nodes_features,
+            "value_nodes": np.stack(
+                [
+                    self.value_weights,
+                    self.fraction_my_outcomes,
+                    self.fraction_opp_outcomes,
+                    my_outcome,
+                    opp_outcome,
+                ],
+                axis=-1,
+                dtype=np.float32,
+            ),
+            "edge_indices": self.edge_indices,
+            "opponent_encoding": opponent_encoding,
+            "accept_mask": accept_mask,
+        }
+        return obs
+
+    def register_opp_action(self, action: dict):
+        self.num_opp_actions += 1
+        self.counted_opp_outcomes[self.value_offset + action["outcome"]] += 1
+        self.fraction_opp_outcomes = self.counted_opp_outcomes / self.num_opp_actions
+
+    def register_my_action(self, action: dict):
+        self.num_my_actions += 1
+        self.counted_my_outcomes[self.value_offset + action["outcome"]] += 1
+        self.fraction_my_outcomes = self.counted_my_outcomes / self.num_my_actions
+
+
+class RLAgentGraphObsPure(RLAgent):
+    def __init__(self, agent_id: str, utility_function: UtilityFunction, num_used_agents: int):
+        super().__init__(agent_id, utility_function, num_used_agents)
+
+        self.num_objectives = len(utility_function.objective_weights)
+        values_per_objective = [len(v) for v in utility_function.value_weights.values()]
+        objective_weights = [v for v in utility_function.objective_weights.values()]
+
+        self.value_offset = np.insert(np.cumsum(values_per_objective), 0, 0)[:-1]
+
+        self.edge_links = []
+        for i in range(self.num_objectives):
+            self.edge_links.append([0, i + 1])
+
+        start = self.num_objectives + 1
+        for i, n in enumerate(values_per_objective):
+            for j in range(n):
+                self.edge_links.append([i + 1, start + j])
+            start += j + 1
+
+        self.edge_links = np.array(self.edge_links, dtype=np.int64)
+
+        self.value_weights = np.array([v2 for v1 in utility_function.value_weights.values() for v2 in v1.values()], dtype=np.float32)
+        self.counted_opp_outcomes = np.zeros_like(self.value_weights, dtype=np.float32)
+        self.fraction_opp_outcomes = np.zeros_like(self.value_weights, dtype=np.float32)
+
+        self.objective_nodes_features =  np.array([[v, o, 0, 0] for v, o in zip(values_per_objective, objective_weights)], dtype=np.float32)
+
+        self.num_opp_actions = 0
+
+    @staticmethod
+    def observation_space(utility_function, num_used_agents):
+        observation_space = Dict(
+            {
+                "graph": Graph(node_space=Box(0, np.inf, shape=(4,)), dtype=np.float32),
+                "num_objectives": Box(1, np.inf, dtype=np.int64),
                 "accept_mask": Box(0, 1, shape=(2,), dtype=bool),
             }
         )
@@ -535,21 +630,31 @@ class RLAgentGraphObs3(RLAgent):
         if len(last_actions) > 1:
             my_outcome[self.value_offset + last_actions[-2]["outcome"]] = 1
 
+        nodes = np.stack(
+            [
+                np.array(
+                    [self.num_objectives, deadline.get_progress(), 0, 0],
+                    dtype=np.float32,
+                ),
+                self.objective_nodes_features,
+                np.stack(
+                    [
+                        self.value_weights,
+                        self.fraction_opp_outcomes,
+                        my_outcome,
+                        opp_outcome,
+                    ],
+                    axis=-1,
+                    dtype=np.float32,
+                ),
+            ],
+            axis=0,
+            dtype=np.float32,
+        )
+
         obs = {
-            "head_node": np.array([self.num_objectives, deadline.get_progress()], dtype=np.float32),
-            "objective_nodes": self.objective_nodes_features,
-            "value_nodes": np.stack(
-                [
-                    self.value_weights,
-                    self.fraction_opp_outcomes,
-                    my_outcome,
-                    opp_outcome,
-                ],
-                axis=-1,
-                dtype=np.float32,
-            ),
-            "edge_indices": self.edge_indices,
-            "opponent_encoding": opponent_encoding,
+            "graph": GraphInstance(nodes=nodes, edge_links=self.edge_links),
+            "num_objectives": self.num_objectives,
             "accept_mask": accept_mask,
         }
         return obs
@@ -558,6 +663,7 @@ class RLAgentGraphObs3(RLAgent):
         self.num_opp_actions += 1
         self.counted_opp_outcomes[self.value_offset + action["outcome"]] += 1
         self.fraction_opp_outcomes = self.counted_opp_outcomes / self.num_opp_actions
+
 
 class HigaEtAl(RLAgent):
     def __init__(self, agent_id: str, utility_function: UtilityFunction, num_used_agents: int):
