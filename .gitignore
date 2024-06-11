@@ -11,5 +11,8 @@ environment/scenarios/*
 
 output
 wandb
+docs
+models
+analysis
 
 *.sbatch
