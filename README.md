@@ -1,6 +1,6 @@
 This repository accompanies a paper published at the Reinforcement Learning Conference 2024:
 
-**Towards General Negotiation Strategies with End-to-End Reinforcement Learning**
+**Towards General Negotiation Strategies with End-to-End Reinforcement Learning**\
 B.M. Renting, T.M. Moerland, H.H. Hoos, C.M. Jonker
 
 
