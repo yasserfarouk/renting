@@ -1,5 +1,4 @@
 from collections import deque
-from functools import lru_cache
 from itertools import cycle
 from pathlib import Path
 
@@ -23,12 +22,14 @@ REQUIRED_RL_AGENT = {
     "AttentionGraphToGraph": RLAgentGraphObsPartialAdj,
     "AttentionGraphToGraph2": RLAgentGraphObs2,
     "AttentionGraphToGraph3": RLAgentGraphObs2,
+    "AttentionGraphToGraph4": RLAgentGraphObs2,
     "PureGNN": RLAgentGraphObs,
     "PureGNN2": RLAgentGraphObs3,
     "HigaEtAl": HigaEtAl,
     "FixedToFixed": HigaEtAl,
     "FixedToFixed2": HigaEtAl,
     "FixedToFixed3": HigaEtAl2,
+    "HigaEtAl2": HigaEtAl2,
     "GraphToGraphLargeFixedAction": RLAgentGraphObsPartialAdjFixedLargeAction,
     "Test": Test,
 }
@@ -200,7 +201,10 @@ class NegotiationEnvZoo(ParallelEnv):
         )
         self.render_mode = render_mode
 
-        self.scenario = Scenario.from_directory(Path(env_config["scenario"]))
+        if env_config["scenario"] == "random":
+            self.scenario = Scenario.create_random([200, 1000], default_rng(0), 5)
+        else:
+            self.scenario = Scenario.from_directory(Path(env_config["scenario"]))
 
         self.env_config = env_config
         self.used_agents = {a: AGENTS[a] for a in env_config["used_agents"]}
@@ -220,7 +224,10 @@ class NegotiationEnvZoo(ParallelEnv):
 
         self.agents = self.possible_agents
 
-        self.scenario = Scenario.from_directory(Path(self.env_config["scenario"]), self.np_random)
+        if self.env_config["scenario"] == "random":
+            self.scenario = Scenario.create_random([200, 1000], self.np_random, 5)
+        else:
+            self.scenario = Scenario.from_directory(Path(self.env_config["scenario"]), self.np_random)
 
         self.last_actions = deque(maxlen=2)
         self.opponent_encoding = 0
