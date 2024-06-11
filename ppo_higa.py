@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
+
 import cloudpickle
 import numpy as np
 import supersuit as ss
@@ -63,7 +64,6 @@ class Args:
     hidden_size: int = 32
     heads: int = 1
     ray_value_clip: bool = False
-    out_layers: int = 1
     gnn_layers: int = 4
 
     seed: int = 1
@@ -223,9 +223,9 @@ def main():
     #     [lambda: NegotiationEnvZoo(env_config, i) for i in range(args.num_envs)],
     # )
 
-    # envs = concat_envs(env_config, args.num_envs, num_cpus=args.num_envs)
+    envs = concat_envs(env_config, args.num_envs, num_cpus=args.num_envs)
 
-    agent: PureGNN2 = AGENT_MODULES[args.module](len(used_agents), args).to(device)
+    agent: PureGNN2 = AGENT_MODULES[args.module](envs, args).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     batch_size = (args.num_steps, args.num_envs)
@@ -242,22 +242,13 @@ def main():
     # # next_obs = torch.Tensor(next_obs).to(device)
     # next_obs = TensorDict(next_obs, batch_size=(args.num_envs,), device=device)
     # next_done = torch.zeros(args.num_envs).to(device)
+    obs, actions = init_tensors(batch_size, envs, device)
+
+    next_obs, _ = envs.reset(seed=args.seed)
+    next_obs = TensorDict(next_obs, batch_size=(args.num_envs,), device=device)
+    next_done = torch.zeros(args.num_envs).to(device)
 
     for iteration in range(1, args.num_iterations + 1):
-        if args.scenario.startswith("environment/scenarios/random_tmp") or iteration == 1:
-            if args.scenario.startswith("environment/scenarios/random_tmp"):
-                scenario = Scenario.create_random([200, 1000], scenario_rng, 5, True)
-                # scenario.calculate_specials()
-                scenario.to_directory(Path(args.scenario))
-            
-            envs = concat_envs(env_config, args.num_envs, num_cpus=args.num_envs)
-            agent.action_nvec = tuple(envs.single_action_space.nvec)
-            obs, actions = init_tensors(batch_size, envs, device)
-
-            next_obs, _ = envs.reset(seed=args.seed)
-            next_obs = TensorDict(next_obs, batch_size=(args.num_envs,), device=device)
-            next_done = torch.zeros(args.num_envs).to(device)
-
         # Annealing the rate if instructed to do so.
         if args.anneal_lr:
             frac = 1.0 - (iteration - 1.0) / args.num_iterations
@@ -436,8 +427,8 @@ def main():
             if args.anneal_gamma:
                 logger.log({"gamma": args.gammanow}, global_step)
             logger.log({"learning_rate": optimizer.param_groups[0]["lr"]}, global_step)
-            logger.log({"losses/unclipped_value": newvalue.mean().item()}, global_step)
-            logger.log({"losses/gradient_norm": total_norm.item()}, global_step)
+            logger.log({"losses/unclipped_value": newvalue.detach().mean().numpy()}, global_step)
+            logger.log({"losses/gradient_norm": total_norm.detach().numpy()}, global_step)
             logger.log({"losses/total_loss": loss.item()}, global_step)
             logger.log({"losses/value_loss": v_loss.item()}, global_step)
             logger.log({"losses/policy_loss": pg_loss.item()}, global_step)
