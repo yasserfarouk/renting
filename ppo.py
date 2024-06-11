@@ -1,18 +1,18 @@
-# docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/ppo/#ppopy
 import random
 import time
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
+
 import cloudpickle
 import numpy as np
 import supersuit as ss
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import tyro
 from gymnasium.spaces import Box, Discrete, MultiDiscrete
@@ -22,23 +22,10 @@ from tensordict import TensorDict
 from torch import Tensor
 
 from environment.agents.geniusweb import AGENTS
-from environment.agents.policy.PPO import (
-    AttentionGraphToGraph3,
-    AttentionGraphToGraph4,
-    FixedToFixed3,
-    PureGNN2,
-    HigaEtAl2,
-)
+from environment.agents.policy.PPO import GNN, HigaEtAl
 from environment.negotiation import NegotiationEnvZoo
 from environment.scenario import Scenario
 
-AGENT_MODULES = {
-    "AttentionGraphToGraph4": AttentionGraphToGraph4,
-    "AttentionGraphToGraph3": AttentionGraphToGraph3,
-    "FixedToFixed3": FixedToFixed3,
-    "PureGNN2": PureGNN2,
-    "HigaEtAl2": HigaEtAl2,
-}
 MAP_DTYPE = {
     "int32": torch.int32,
     "int64": torch.int64,
@@ -47,25 +34,31 @@ MAP_DTYPE = {
     "bool": torch.bool,
 }
 
+
+class Policies(Enum):
+    GNN = GNN
+    HigaEtAl = HigaEtAl
+
+
 @dataclass
 class Args:
-    deadline: int
-    module: str
-    opponent: str
     debug: bool = False
-    use_opponent_encoding: bool = False
-    opponent_sets: tuple[Literal["ANL2022","ANL2023","CSE3210","BASIC"], ...] = ("ANL2022","ANL2023","CSE3210")
+    deadline: int = 40
+    policy: Policies = Policies.GNN
+    opponent: str = "random"
+    opponent_sets: tuple[Literal["ANL2022","ANL2023","CSE3210","BASIC"], ...] = ("BASIC")
     scenario: str = "environment/scenarios/fixed_utility"
-    random_agent_order: bool = False
-    DPO: bool = False
+    random_agent_order: bool = True
+
+    # GNN policy settings
     gat_v2: bool = False
     add_self_loops: bool = True
-    hidden_size: int = 32
-    heads: int = 1
-    ray_value_clip: bool = False
+    hidden_size: int = 256
+    heads: int = 4
     out_layers: int = 1
     gnn_layers: int = 4
 
+    # Experiment settings
     seed: int = 1
     """seed of the experiment"""
     torch_deterministic: bool = True
@@ -80,7 +73,7 @@ class Args:
     """the entity (team) of wandb's project"""
 
     # Algorithm specific arguments
-    total_timesteps: int = 500000
+    total_timesteps: int = 2000000
     """total timesteps of the experiments"""
     learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
@@ -94,11 +87,11 @@ class Args:
     """Toggle discount factor annealing"""
     gamma: float = 1
     """the discount factor gamma"""
-    gae_lambda: float = 1
+    gae_lambda: float = 0.95
     """the lambda for the general advantage estimation"""
     num_minibatches: int = 30
     """the number of mini-batches"""
-    update_epochs: int = 1
+    update_epochs: int = 30
     """the K epochs to update the policy"""
     norm_adv: bool = False #NOTE:?
     """Toggles advantages normalization"""
@@ -124,7 +117,6 @@ class Args:
     """the number of iterations (computed in runtime)"""
 
 
-
 def concat_envs(env_config, num_vec_envs, num_cpus=0):
     def vec_env_args(env, num_envs):
         def env_fn():
@@ -142,6 +134,7 @@ def concat_envs(env_config, num_vec_envs, num_cpus=0):
     vec_env.is_vector_env = True
     return vec_env
 
+
 def init_tensors(batch_size, envs, device) -> tuple[TensorDict, Tensor]:
     # ALGO Logic: Storage setup
     obs = {}
@@ -156,20 +149,6 @@ def init_tensors(batch_size, envs, device) -> tuple[TensorDict, Tensor]:
             raise NotImplementedError
         obs[obs_key] = torch.zeros(batch_size + shape, dtype=MAP_DTYPE[str(obs_space.dtype)])
     obs: TensorDict = TensorDict(obs, batch_size=batch_size, device=device)
-    # obs2: TensorDict = TensorDict(
-    #     {
-    #         "head_node": torch.zeros(batch_size + envs.single_observation_space["head_node"].shape),
-    #         "objective_nodes": torch.zeros(batch_size + envs.single_observation_space["objective_nodes"].shape),
-    #         "value_nodes": torch.zeros(batch_size + envs.single_observation_space["value_nodes"].shape),
-    #         # "edge_indices_val_obj": torch.zeros(batch_size + envs.single_observation_space["edge_indices_val_obj"].shape, dtype=torch.int64),
-    #         # "edge_indices_obj_head": torch.zeros(batch_size + envs.single_observation_space["edge_indices_obj_head"].shape, dtype=torch.int64),
-    #         "edge_indices": torch.zeros(batch_size + envs.single_observation_space["edge_indices"].shape, dtype=torch.int64),
-    #         "opponent_encoding": torch.zeros(batch_size + envs.single_observation_space["opponent_encoding"].shape, dtype=torch.int64),
-    #         "accept_mask": torch.zeros(batch_size + envs.single_observation_space["accept_mask"].shape, dtype=torch.bool),
-    #     },
-    #     batch_size=batch_size,
-    #     device=device,
-    # )
     actions: torch.Tensor = torch.zeros(batch_size + envs.single_action_space.shape).to(device)
 
     return obs, actions
@@ -186,7 +165,6 @@ def main():
 
     if args.wandb:
         import wandb
-
         logger = wandb.init(
             entity="brenting",
             project=args.wandb_project_name,
@@ -195,11 +173,6 @@ def main():
             save_code=True,
         )
     
-    # writer = SummaryWriter(f"runs/{run_name}")
-    # writer.add_text(
-    #     "hyperparameters",
-    #     "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
-    # )
 
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
@@ -219,17 +192,11 @@ def main():
         "deadline": {"rounds": args.deadline, "ms": 10000},
         "random_agent_order": args.random_agent_order,
     }
-    # envs = gym.vector.AsyncVectorEnv(
-    #     [lambda: NegotiationEnvZoo(env_config, i) for i in range(args.num_envs)],
-    # )
 
-    # envs = concat_envs(env_config, args.num_envs, num_cpus=args.num_envs)
-
-    agent: PureGNN2 = AGENT_MODULES[args.module](len(used_agents), args).to(device)
+    agent: GNN = Policies[args.policy](len(used_agents), args).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     batch_size = (args.num_steps, args.num_envs)
-    # obs, actions = init_tensors(batch_size, envs, device)
     logprobs = torch.zeros(batch_size).to(device)
     rewards = torch.zeros(batch_size).to(device)
     dones = torch.zeros(batch_size).to(device)
@@ -238,16 +205,11 @@ def main():
     # TRY NOT TO MODIFY: start the game
     global_step = 0
     start_time = time.time()
-    # next_obs, _ = envs.reset(seed=args.seed)
-    # # next_obs = torch.Tensor(next_obs).to(device)
-    # next_obs = TensorDict(next_obs, batch_size=(args.num_envs,), device=device)
-    # next_done = torch.zeros(args.num_envs).to(device)
 
     for iteration in range(1, args.num_iterations + 1):
         if args.scenario.startswith("environment/scenarios/random_tmp") or iteration == 1:
             if args.scenario.startswith("environment/scenarios/random_tmp"):
                 scenario = Scenario.create_random([200, 1000], scenario_rng, 5, True)
-                # scenario.calculate_specials()
                 scenario.to_directory(Path(args.scenario))
             
             envs = concat_envs(env_config, args.num_envs, num_cpus=args.num_envs)
@@ -269,9 +231,6 @@ def main():
             frac = (iteration - 1.0) / args.num_iterations
             args.gammanow = args.gamma - (frac * (args.gamma - 1.0))
 
-        # print("Collecting rollouts..")
-        # episodic_return = .0
-        # episodes_done = 0
         utility_all_agents = defaultdict(lambda: .0)
         count_all_agents = defaultdict(lambda: 0)
         log_metrics = defaultdict(lambda: [.0, 0])
@@ -305,9 +264,6 @@ def main():
                         log_metrics["self_accepted"][1] += 1
                         log_metrics["found_agreement"][0] += info["found_agreement"]
                         log_metrics["found_agreement"][1] += 1
-                        # wandb.log({"rounds_played": info["rounds_played"]}, step=global_step)
-                        # wandb.log({"self_accepted": info["self_accepted"]}, step=global_step)
-                        # wandb.log({"found_agreement": info["found_agreement"]}, step=global_step)
                 log_metrics["episode_reward_mean"][0] += reward[next_done_bool].sum()
                 log_metrics["episode_reward_mean"][1] += next_done_bool.sum()
         
@@ -315,22 +271,9 @@ def main():
             for metric, (value, count) in log_metrics.items():
                 logger.log({metric: value / count}, step=global_step)
                 print(f"{metric}: {value / count}")
-            # wandb.log({"episode_reward_mean": episodic_return / episodes_done}, step=global_step)
             for agent_id, utility in utility_all_agents.items():
                 logger.log({f"utility/{agent_id}": utility / count_all_agents[agent_id]}, step=global_step)
 
-            # if args.scenario.startswith("environment/scenarios/random"):
-            #     wandb.log({"scenario/size": scenario.size}, step=global_step)
-            #     wandb.log({"scenario/opposition": scenario.opposition}, step=global_step)
-            #     wandb.log({"scenario/distribution": scenario.distribution}, step=global_step)
-            #     wandb.log({"scenario/max_SW_0": scenario.SW_outcome["utility"][0]}, step=global_step)
-            #     wandb.log({"scenario/max_SW_1": scenario.SW_outcome["utility"][1]}, step=global_step)
-            #     wandb.log({"scenario/nash_0": scenario.nash_outcome["utility"][0]}, step=global_step)
-            #     wandb.log({"scenario/nash_0": scenario.nash_outcome["utility"][1]}, step=global_step)
-            #     wandb.log({"scenario/kalai_0": scenario.kalai_outcome["utility"][0]}, step=global_step)
-            #     wandb.log({"scenario/kalai_0": scenario.kalai_outcome["utility"][1]}, step=global_step)
-
-        # print("Calculating returns and advantages..")
         # bootstrap value if not done
         with torch.no_grad():
             next_value = agent.get_value(next_obs).reshape(1, -1)
@@ -355,12 +298,10 @@ def main():
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
 
-        # print("Optimizing policy...")
         # Optimizing the policy and value network
         b_inds = np.arange(args.batch_size)
         clipfracs = []
         for epoch in range(args.update_epochs):
-            # print(f"Epoch {epoch}")
             np.random.shuffle(b_inds)
             for start in range(0, args.batch_size, args.minibatch_size):
                 end = start + args.minibatch_size
@@ -381,36 +322,22 @@ def main():
                     mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
                 # Policy loss
-                if args.DPO: # see DPO paper
-                    is_pos = (mb_advantages >= 0.0).float()
-                    r1 = ratio - 1.0
-                    drift1 = F.relu(r1 * mb_advantages - 2 * F.tanh(r1 * mb_advantages / 2))
-                    drift2 = F.relu(
-                        logratio * mb_advantages - 0.6 * F.tanh(logratio * mb_advantages / 0.6)
-                    )
-                    drift = drift1 * is_pos + drift2 * (1 - is_pos)
-                    pg_loss = -(ratio * mb_advantages - drift).mean()
-                else:
-                    pg_loss1 = -mb_advantages * ratio
-                    pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
-                    pg_loss = torch.max(pg_loss1, pg_loss2).mean() #NOTE: identical
+                pg_loss1 = -mb_advantages * ratio
+                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
+                pg_loss = torch.max(pg_loss1, pg_loss2).mean() #NOTE: identical
 
                 # Value loss
                 newvalue = newvalue.view(-1)
                 if args.clip_vloss:
-                    if args.ray_value_clip:
-                        v_loss = torch.pow(newvalue - b_returns[mb_inds], 2.0)
-                        v_loss = torch.clamp(v_loss, 0, 10.0).mean()
-                    else:
-                        v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2 #NOTE: log clips, clip vloss directly
-                        v_clipped = b_values[mb_inds] + torch.clamp(
-                            newvalue - b_values[mb_inds],
-                            -args.clip_coef,
-                            args.clip_coef,
-                        )
-                        v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
-                        v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
-                        v_loss = 0.5 * v_loss_max.mean()
+                    v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2 #NOTE: log clips, clip vloss directly
+                    v_clipped = b_values[mb_inds] + torch.clamp(
+                        newvalue - b_values[mb_inds],
+                        -args.clip_coef,
+                        args.clip_coef,
+                    )
+                    v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
+                    v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
+                    v_loss = 0.5 * v_loss_max.mean()
 
                 else:
                     v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
