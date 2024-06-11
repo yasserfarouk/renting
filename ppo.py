@@ -46,7 +46,7 @@ class Args:
     deadline: int = 40
     policy: Policies = Policies.GNN
     opponent: str = "random"
-    opponent_sets: tuple[Literal["ANL2022","ANL2023","CSE3210","BASIC"], ...] = ("BASIC")
+    opponent_sets: tuple[Literal["ANL2022","ANL2023","CSE3210","BASIC"], ...] = ("BASIC",)
     scenario: str = "environment/scenarios/fixed_utility"
     random_agent_order: bool = True
 
@@ -83,8 +83,6 @@ class Args:
     """the number of steps to run in each environment per policy rollout"""
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
-    anneal_gamma: bool = False
-    """Toggle discount factor annealing"""
     gamma: float = 1
     """the discount factor gamma"""
     gae_lambda: float = 0.95
@@ -155,13 +153,17 @@ def init_tensors(batch_size, envs, device) -> tuple[TensorDict, Tensor]:
 
 def main():
     args = tyro.cli(Args)
-    if args.debug:
-        args.num_envs = 2
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
+    if args.debug:
+        args.num_envs = 2
+        args.batch_size = 20
+        args.minibatch_size = 20
+        args.num_iterations = 2
+        args.update_epochs = 1
 
-    run_name = f"{args.module}_{datetime.now().strftime('%y-%m-%d_%H:%M:%S')}_{uuid4()}"
+    run_name = f"{args.policy.name}_{datetime.now().strftime('%y-%m-%d_%H:%M:%S')}_{uuid4()}"
 
     if args.wandb:
         import wandb
@@ -186,14 +188,15 @@ def main():
     # env setup
     used_agents = [a for a in AGENTS if a.startswith(tuple(args.opponent_sets))]
     env_config = {
-        "agents": [f"RL_{args.module}", args.opponent],
+        "agents": [f"RL_{args.policy.name}", args.opponent],
         "used_agents": used_agents,
         "scenario": args.scenario,
         "deadline": {"rounds": args.deadline, "ms": 10000},
         "random_agent_order": args.random_agent_order,
     }
+    envs = concat_envs(env_config, args.num_envs, num_cpus=args.num_envs)
 
-    agent: GNN = Policies[args.policy](len(used_agents), args).to(device)
+    agent: GNN = args.policy.value(envs, args).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     batch_size = (args.num_steps, args.num_envs)
@@ -225,11 +228,6 @@ def main():
             frac = 1.0 - (iteration - 1.0) / args.num_iterations
             lrnow = frac * args.learning_rate
             optimizer.param_groups[0]["lr"] = lrnow
-
-        # Anneal discount factor if instructed to do so.
-        if args.anneal_gamma:
-            frac = (iteration - 1.0) / args.num_iterations
-            args.gammanow = args.gamma - (frac * (args.gamma - 1.0))
 
         utility_all_agents = defaultdict(lambda: .0)
         count_all_agents = defaultdict(lambda: 0)
@@ -286,8 +284,8 @@ def main():
                 else:
                     nextnonterminal = 1.0 - dones[t + 1]
                     nextvalues = values[t + 1]
-                delta = rewards[t] + (args.gammanow if args.anneal_gamma else args.gamma) * nextvalues * nextnonterminal - values[t]
-                advantages[t] = lastgaelam = delta + (args.gammanow if args.anneal_gamma else args.gamma) * args.gae_lambda * nextnonterminal * lastgaelam
+                delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
+                advantages[t] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
             returns = advantages + values
 
         # flatten the batch
@@ -360,11 +358,9 @@ def main():
 
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         if args.wandb:
-            if args.anneal_gamma:
-                logger.log({"gamma": args.gammanow}, global_step)
             logger.log({"learning_rate": optimizer.param_groups[0]["lr"]}, global_step)
-            logger.log({"losses/unclipped_value": newvalue.mean().item()}, global_step)
-            logger.log({"losses/gradient_norm": total_norm.item()}, global_step)
+            logger.log({"losses/unclipped_value": newvalue.detach().mean().numpy()}, global_step)
+            logger.log({"losses/gradient_norm": total_norm.detach().numpy()}, global_step)
             logger.log({"losses/total_loss": loss.item()}, global_step)
             logger.log({"losses/value_loss": v_loss.item()}, global_step)
             logger.log({"losses/policy_loss": pg_loss.item()}, global_step)
@@ -378,13 +374,14 @@ def main():
 
         model_path = f"models/{run_name}"
         torch.save(agent.state_dict(), model_path)
-    
-    artifact = wandb.Artifact("model", type="model")
-    artifact.add_file(model_path)
-    logger.log_artifact(artifact)
 
     envs.close()
-    logger.finish()
+    
+    if args.wandb:
+        artifact = wandb.Artifact("model", type="model")
+        artifact.add_file(model_path)
+        logger.log_artifact(artifact)
+        logger.finish()
 
 
 if __name__ == "__main__":

@@ -8,8 +8,7 @@ from typing import Iterable
 
 import numpy as np
 import plotly.graph_objects as go
-from numpy.random import Generator
-from numpy.random import default_rng
+from numpy.random import Generator, default_rng
 
 
 class UtilityFunction:
