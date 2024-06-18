@@ -361,8 +361,8 @@ def main():
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         if args.wandb:
             logger.log({"learning_rate": optimizer.param_groups[0]["lr"]}, global_step)
-            logger.log({"losses/unclipped_value": newvalue.detach().mean().numpy()}, global_step)
-            logger.log({"losses/gradient_norm": total_norm.detach().numpy()}, global_step)
+            logger.log({"losses/unclipped_value": newvalue.detach().mean().cpu().numpy()}, global_step)
+            logger.log({"losses/gradient_norm": total_norm.detach().cpu().numpy()}, global_step)
             logger.log({"losses/total_loss": loss.item()}, global_step)
             logger.log({"losses/value_loss": v_loss.item()}, global_step)
             logger.log({"losses/policy_loss": pg_loss.item()}, global_step)
