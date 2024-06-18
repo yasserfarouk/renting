@@ -19,7 +19,7 @@ REQUIRED_RL_AGENT = {
 }
 
 class NegotiationEnvZoo(ParallelEnv):
-    metadata = {"name": "justice_env"}
+    metadata = {"name": "negotiation_env"}
 
     def __init__(self, env_config, render_mode=None):
         self.possible_agents = [a for a in env_config["agents"] if a.startswith("RL")]
