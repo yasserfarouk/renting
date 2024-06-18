@@ -46,7 +46,7 @@ class Args:
     debug: bool = False
     deadline: int = 40
     policy: Policies = Policies.GNN
-    opponent: str = "random"
+    opponent: Literal["all", "random"] = "random"
     opponent_sets: tuple[Literal["ANL2022","ANL2023","CSE3210","BASIC"], ...] = ("BASIC",)
     scenario: str = "environment/scenarios/fixed_utility"
     random_agent_order: bool = True
