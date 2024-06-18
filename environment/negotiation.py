@@ -46,9 +46,6 @@ class NegotiationEnvZoo(ParallelEnv):
         if not hasattr(self, "np_random"):
             self.np_random = default_rng(seed) if seed else default_rng(0)
 
-        if options and "worker_index" in options:
-            self.worker_index = options["worker_index"]
-
         self.agents = self.possible_agents
 
         if self.env_config["scenario"] == "random":
@@ -81,7 +78,8 @@ class NegotiationEnvZoo(ParallelEnv):
                 self.opponent_encoding = self.env_config["used_agents"].index(selected_agent)
                 agent_init = agent_class(selected_agent, utility_function, self.deadline)
             elif agent == "all":
-                selected_agent, agent_class = list(self.used_agents.items())[self.worker_index]
+                used_agents_list = list(self.used_agents.items())
+                selected_agent, agent_class = used_agents_list[self.worker_id % len(used_agents_list)]
                 self.opponent_encoding = self.env_config["used_agents"].index(selected_agent)
                 agent_init = agent_class(selected_agent, utility_function, self.deadline)
             elif agent in self.used_agents:

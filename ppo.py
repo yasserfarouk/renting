@@ -4,6 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from functools import partial
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
@@ -117,11 +118,12 @@ class Args:
 
 def concat_envs(env_config, num_vec_envs, num_cpus=0):
     def vec_env_args(env, num_envs):
-        def env_fn():
+        def env_fn(worker_id):
             env_copy = cloudpickle.loads(cloudpickle.dumps(env))
+            env_copy.par_env.worker_id = worker_id
             return env_copy
+        return [partial(env_fn, i) for i in range(num_envs)], env.observation_space, env.action_space
 
-        return [env_fn] * num_envs, env.observation_space, env.action_space
     env = NegotiationEnvZoo(env_config)
     vec_env = ss.pettingzoo_env_to_vec_env_v1(env)
     num_cpus = min(num_cpus, num_vec_envs)
