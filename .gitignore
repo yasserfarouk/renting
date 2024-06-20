@@ -12,7 +12,9 @@ environment/scenarios/*
 output
 wandb
 docs
-models
+models/*
+!GNN
+!HigaEtAl
 analysis
 
 *.sbatch

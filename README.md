@@ -15,6 +15,8 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-To train and test GNN based negotiation agents use the `train.py` and `evaluate.py`.
+To train and test GNN based negotiation agents use the `ppo.py` and `evaluate.py`.
 
-The default arguments are set to match the settings in the paper. To change/view the command line arguments run `python train.py --help`.
+The default arguments are set to match the settings in the paper. To change/view the command line arguments run `python ppo.py --help`.
+
+The figures from the paper can be reproduced using the `paper_results.py` script. A number of tests is defined in the `TESTS` variable in the script. Each of these tests can be run as follows: `python paper_results.py --test_num $TEST_LIST_INDEX`. The trained models are included in this repository. Results will be saved in the `analysis/data` and `analysis/figures` directories.
