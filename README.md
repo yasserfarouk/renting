@@ -1,4 +1,4 @@
-This repository accompanies a paper published at the Reinforcement Learning Conference 2024:
+This repository accompanies a [paper](https://rlj.cs.umass.edu/2024/papers/Paper268.html) published at the Reinforcement Learning Conference 2024:
 
 **Towards General Negotiation Strategies with End-to-End Reinforcement Learning**\
 [B.M. Renting](mailto:b.m.renting@liacs.leidenuniv.nl), [T.M. Moerland](t.m.moerland@liacs.leidenuniv.nl), [H.H. Hoos](hh@aim.rwth-aachen.de), [C.M. Jonker](c.m.jonker@tudelft.nl)
