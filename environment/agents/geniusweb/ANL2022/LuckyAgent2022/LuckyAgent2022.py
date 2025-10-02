@@ -7,17 +7,19 @@ import logging
 from random import randint
 import random
 from time import time
-from tkinter.messagebox import NO
+
+try:
+    from tkinter.messagebox import NO
+except:
+    NO = "no"
 from typing import cast
 import math
-import pickle
 import os
 from statistics import mean
 from geniusweb.actions.Accept import Accept
 from geniusweb.actions.Action import Action
 from geniusweb.actions.Offer import Offer
 from geniusweb.actions.PartyId import PartyId
-from geniusweb.bidspace.AllBidsList import AllBidsList
 from geniusweb.inform.ActionDone import ActionDone
 from geniusweb.inform.Finished import Finished
 from geniusweb.inform.Inform import Inform
@@ -39,7 +41,6 @@ from geniusweb.progress.ProgressRounds import ProgressRounds
 from geniusweb.references.Parameters import Parameters
 from tudelft_utilities_logging.ReportToLogger import ReportToLogger
 from tudelft.utilities.immutablelist.ImmutableList import ImmutableList
-from .utils.opponent_model import OpponentModel
 from geniusweb.profile.utilityspace.LinearAdditive import LinearAdditive
 from .utils.extended_util_space import ExtendedUtilSpace
 from decimal import Decimal
@@ -107,22 +108,27 @@ class LuckyAgent2022(DefaultParty):
         return m
 
     def set_parameters(self, opp):
-        if not self.other or not os.path.exists(f"{self.storage_dir}/m_data_{self.other}"):
+        if not self.other or not os.path.exists(
+            f"{self.storage_dir}/m_data_{self.other}"
+        ):
             self.min = 0.6
             self.e = 0.05
         else:
             rand_num = random.random()
-            saved_data = self.return_saved_data(f'm_data_{self.other}')
-            condition_data = self.return_saved_data(f'c_data_{self.other}')
+            saved_data = self.return_saved_data(f"m_data_{self.other}")
+            condition_data = self.return_saved_data(f"c_data_{self.other}")
             if opp in saved_data:
-                self.good_agreement_u = self.good_agreement_u - \
-                    (len(saved_data[opp]) * 0.01)
+                self.good_agreement_u = self.good_agreement_u - (
+                    len(saved_data[opp]) * 0.01
+                )
                 if self.good_agreement_u < 0.7:
                     self.good_agreement_u = 0.7
                 if len(saved_data[opp]) >= 2:
-                    if (saved_data[opp][-2][0] == 0 and saved_data[opp][-1][0] > 0) or ((saved_data[opp][-2][1] == saved_data[opp][-1][1]) and (saved_data[opp][-2][2] == saved_data[opp][-1][2])):
-                        self.condition_d = condition_data[opp] + \
-                            saved_data[opp][-1][0]
+                    if (saved_data[opp][-2][0] == 0 and saved_data[opp][-1][0] > 0) or (
+                        (saved_data[opp][-2][1] == saved_data[opp][-1][1])
+                        and (saved_data[opp][-2][2] == saved_data[opp][-1][2])
+                    ):
+                        self.condition_d = condition_data[opp] + saved_data[opp][-1][0]
                         if 0 <= self.condition_d < 1:
                             self.condition_d = 1
                         self.epsilon = self.epsilon / self.condition_d
@@ -130,35 +136,37 @@ class LuckyAgent2022(DefaultParty):
                             self.min = saved_data[opp][-1][1]
                             self.e = saved_data[opp][-1][2]
                         else:
-                            if saved_data[opp][-1][0] > 0 and saved_data[opp][-1][0] < self.good_agreement_u:
-                                self.min = saved_data[opp][-1][1] + \
-                                    self.increasing_e
+                            if (
+                                saved_data[opp][-1][0] > 0
+                                and saved_data[opp][-1][0] < self.good_agreement_u
+                            ):
+                                self.min = saved_data[opp][-1][1] + self.increasing_e
                                 if self.min > 0.7:
                                     self.min = 0.7
-                                self.e = saved_data[opp][-1][2] - \
-                                    self.increasing_e
+                                self.e = saved_data[opp][-1][2] - self.increasing_e
                                 if self.e < 0.005:
                                     self.e = 0.005
                             if saved_data[opp][-1][0] == 0:
                                 self.condition_d = condition_data[opp] - (
-                                    1-self.ff(saved_data[opp], saved_data[opp][-1][1]))
+                                    1 - self.ff(saved_data[opp], saved_data[opp][-1][1])
+                                )
                                 if self.condition_d < 0:
                                     self.condition_d = 0
-                                self.min = saved_data[opp][-1][1] - \
-                                    self.decreasing_e
+                                self.min = saved_data[opp][-1][1] - self.decreasing_e
                                 if self.min < 0.5:
                                     self.min = 0.5
-                                self.e = saved_data[opp][-1][2] + \
-                                    self.decreasing_e
+                                self.e = saved_data[opp][-1][2] + self.decreasing_e
                                 if self.e > 0.1:
                                     self.e = 0.1
                             if saved_data[opp][-1][0] >= self.good_agreement_u:
                                 self.min = saved_data[opp][-1][1]
                                 self.e = saved_data[opp][-1][2]
                     else:
-                        if saved_data[opp][-1][0] > 0 and saved_data[opp][-1][0] < self.good_agreement_u:
-                            self.min = saved_data[opp][-1][1] + \
-                                self.increasing_e
+                        if (
+                            saved_data[opp][-1][0] > 0
+                            and saved_data[opp][-1][0] < self.good_agreement_u
+                        ):
+                            self.min = saved_data[opp][-1][1] + self.increasing_e
                             if self.min > 0.7:
                                 self.min = 0.7
                             self.e = saved_data[opp][-1][2] - self.increasing_e
@@ -166,11 +174,11 @@ class LuckyAgent2022(DefaultParty):
                                 self.e = 0.005
                         if saved_data[opp][-1][0] == 0:
                             self.condition_d = condition_data[opp] - (
-                                1-self.ff(saved_data[opp], saved_data[opp][-1][1]))
+                                1 - self.ff(saved_data[opp], saved_data[opp][-1][1])
+                            )
                             if self.condition_d < 0:
                                 self.condition_d = 0
-                            self.min = saved_data[opp][-1][1] - \
-                                self.decreasing_e
+                            self.min = saved_data[opp][-1][1] - self.decreasing_e
                             if self.min < 0.5:
                                 self.min = 0.5
                             self.e = saved_data[opp][-1][2] + self.decreasing_e
@@ -180,7 +188,10 @@ class LuckyAgent2022(DefaultParty):
                             self.min = saved_data[opp][-1][1]
                             self.e = saved_data[opp][-1][2]
                 else:
-                    if saved_data[opp][-1][0] > 0 and saved_data[opp][-1][0] < self.good_agreement_u:
+                    if (
+                        saved_data[opp][-1][0] > 0
+                        and saved_data[opp][-1][0] < self.good_agreement_u
+                    ):
                         self.min = saved_data[opp][-1][1] + self.increasing_e
                         if self.min > 0.7:
                             self.min = 0.7
@@ -189,7 +200,8 @@ class LuckyAgent2022(DefaultParty):
                             self.e = 0.005
                     if saved_data[opp][-1][0] == 0:
                         self.condition_d = condition_data[opp] - (
-                            1-self.ff(saved_data[opp], saved_data[opp][-1][1]))
+                            1 - self.ff(saved_data[opp], saved_data[opp][-1][1])
+                        )
                         if self.condition_d < 0:
                             self.condition_d = 0
                         self.min = saved_data[opp][-1][1] - self.decreasing_e
@@ -207,7 +219,7 @@ class LuckyAgent2022(DefaultParty):
 
     def return_saved_data(self, file_name):
         # for reading also binary mode is important
-        file = open(f"{self.storage_dir}/{file_name}", 'rb')
+        file = open(f"{self.storage_dir}/{file_name}", "rb")
         saved_data = json.load(file)
         file.close()
         return saved_data
@@ -240,9 +252,12 @@ class LuckyAgent2022(DefaultParty):
             self.domain = self.profile.getDomain()
 
             # initialize FrequencyOpponentModel
-            self.opponent_model = FrequencyOpponentModel.FrequencyOpponentModel.create().With(
-                newDomain=self.profile.getDomain(),
-                newResBid=self.profile.getReservationBid())
+            self.opponent_model = (
+                FrequencyOpponentModel.FrequencyOpponentModel.create().With(
+                    newDomain=self.profile.getDomain(),
+                    newResBid=self.profile.getReservationBid(),
+                )
+            )
 
             profile_connection.close()
 
@@ -256,8 +271,7 @@ class LuckyAgent2022(DefaultParty):
             if isinstance(action, Accept):
                 # print(str(actor).rsplit("_", 1)[0], '=>', cast(Offer, action).getBid())
                 agreement_bid = cast(Offer, action).getBid()
-                self.agreement_utility = float(
-                    self.profile.getUtility(agreement_bid))
+                self.agreement_utility = float(self.profile.getUtility(agreement_bid))
                 self.who_accepted = str(actor).rsplit("_", 1)[0]
 
             # ignore action if it is our action
@@ -277,7 +291,7 @@ class LuckyAgent2022(DefaultParty):
             # execute a turn
             self.my_turn()
 
-            #NOTE: ADDED by Bram Renting:
+            # NOTE: ADDED by Bram Renting:
             if isinstance(self.progress, ProgressRounds):
                 self.progress = self.progress.advance()
 
@@ -289,8 +303,7 @@ class LuckyAgent2022(DefaultParty):
             self.logger.log(logging.INFO, "party is terminating:")
             super().terminate()
         else:
-            self.logger.log(logging.WARNING,
-                            "Ignoring unknown info " + str(data))
+            self.logger.log(logging.WARNING, "Ignoring unknown info " + str(data))
 
     def getCapabilities(self) -> Capabilities:
         """MUST BE IMPLEMENTED
@@ -327,17 +340,18 @@ class LuckyAgent2022(DefaultParty):
         """
         # if it is an offer, set the last received bid
         if isinstance(action, Offer):
-
             bid = cast(Offer, action).getBid()
 
             # update opponent model with bid
             self.opponent_model = self.opponent_model.WithAction(
-                action=action, progress=self.progress)
+                action=action, progress=self.progress
+            )
             # set bid as last received
             self.last_received_bid = bid
             # self.received_bids.append(bid)
-            self.received_bid_details.append(BidDetail(
-                bid, float(self.profile.getUtility(bid))))
+            self.received_bid_details.append(
+                BidDetail(bid, float(self.profile.getUtility(bid)))
+            )
 
     def my_turn(self):
         """This method is called when it is our turn. It should decide upon an action
@@ -356,7 +370,8 @@ class LuckyAgent2022(DefaultParty):
             action = Offer(self.me, next_bid)
             # self.my_bids.append(next_bid)
             self.my_bid_details.append(
-                BidDetail(next_bid, float(self.profile.getUtility(next_bid))))
+                BidDetail(next_bid, float(self.profile.getUtility(next_bid)))
+            )
 
         # send the action
         self.send_action(action)
@@ -382,7 +397,7 @@ class LuckyAgent2022(DefaultParty):
             # c_data = pickle.load(dbfile_c)
             # dbfile_c.close()
             # NEW
-            with open(f"{self.storage_dir}/c_data_{self.other}", 'r') as dbfile_c:
+            with open(f"{self.storage_dir}/c_data_{self.other}", "r") as dbfile_c:
                 c_data = json.load(dbfile_c)
 
         if os.path.exists(f"{self.storage_dir}/c_data_{self.other}"):
@@ -394,7 +409,7 @@ class LuckyAgent2022(DefaultParty):
         # pickle.dump(c_data, dbfile_c)
         # dbfile_c.close()
         # NEW
-        with open(f"{self.storage_dir}/c_data_{self.other}", 'w') as dbfile_c:
+        with open(f"{self.storage_dir}/c_data_{self.other}", "w") as dbfile_c:
             json.dump(c_data, dbfile_c, indent=2)
 
         m_data = {}
@@ -404,9 +419,8 @@ class LuckyAgent2022(DefaultParty):
             # m_data = pickle.load(dbfile)
             # dbfile.close()
             # NEW
-            with open(f"{self.storage_dir}/m_data_{self.other}", 'r') as dbfile:
+            with open(f"{self.storage_dir}/m_data_{self.other}", "r") as dbfile:
                 m_data = json.load(dbfile)
-
 
         if os.path.exists(f"{self.storage_dir}/m_data_{self.other}"):
             os.remove(f"{self.storage_dir}/m_data_{self.other}")
@@ -415,7 +429,9 @@ class LuckyAgent2022(DefaultParty):
         if self.other in m_data:
             m_data[self.other].append(m_tuple)
         else:
-            m_data[self.other] = [m_tuple, ]
+            m_data[self.other] = [
+                m_tuple,
+            ]
 
         # OLD
         # dbfile = open(f"{self.storage_dir}/m_data", 'ab')
@@ -423,7 +439,7 @@ class LuckyAgent2022(DefaultParty):
         # pickle.dump(m_data, dbfile)
         # dbfile.close()
         # NEW
-        with open(f"{self.storage_dir}/m_data_{self.other}", 'w') as dbfile:
+        with open(f"{self.storage_dir}/m_data_{self.other}", "w") as dbfile:
             json.dump(m_data, dbfile, indent=2)
 
     ###########################################################################################
@@ -440,14 +456,23 @@ class LuckyAgent2022(DefaultParty):
         if self.profile.getReservationBid() is None:
             reservation = 0.0
         else:
-            reservation = self.profile.getUtility(
-                self.profile.getReservationBid())
+            reservation = self.profile.getUtility(self.profile.getReservationBid())
 
         received_bid_utility = self.profile.getUtility(received_bid)
-        condition1 = received_bid_utility >= self.threshold_acceptance and received_bid_utility >= reservation
-        condition2 = progress > 0.97 and received_bid_utility > self.min and received_bid_utility >= reservation
-        condition3 = self.alpha*float(received_bid_utility) + self.betta >= float(
-            self.profile.getUtility(next_bid)) and received_bid_utility >= reservation
+        condition1 = (
+            received_bid_utility >= self.threshold_acceptance
+            and received_bid_utility >= reservation
+        )
+        condition2 = (
+            progress > 0.97
+            and received_bid_utility > self.min
+            and received_bid_utility >= reservation
+        )
+        condition3 = (
+            self.alpha * float(received_bid_utility) + self.betta
+            >= float(self.profile.getUtility(next_bid))
+            and received_bid_utility >= reservation
+        )
 
         return condition1 or condition2 or condition3
 
@@ -461,17 +486,17 @@ class LuckyAgent2022(DefaultParty):
 
         utility_goals = []
         for i in range(NUMBER_OF_GOALS):
-            utility_goals.append(self.threshold_low+s*i)
+            utility_goals.append(self.threshold_low + s * i)
         utility_goals.append(self.threshold_high)
 
         options: ImmutableList[Bid] = self._extendedspace.getBids(
-            Decimal(random.choice(utility_goals)))
+            Decimal(random.choice(utility_goals))
+        )
 
         opponent_utilities = []
         for option in options:
             if self.opponent_model != None:
-                opp_utility = float(
-                    self.opponent_model.getUtility(option))
+                opp_utility = float(self.opponent_model.getUtility(option))
                 if opp_utility > 0:
                     opponent_utilities.append(opp_utility)
                 else:
@@ -494,18 +519,20 @@ class LuckyAgent2022(DefaultParty):
 
     # ************************************************************
     def f(self, t, k, e):
-        return k + (1-k)*(t**(1/e))
+        return k + (1 - k) * (t ** (1 / e))
 
     def p(self, min1, max1, e, t):
-        return min1 + (1-self.f(t, 0, e))*(max1-min1)
+        return min1 + (1 - self.f(t, 0, e)) * (max1 - min1)
 
     def cal_thresholds(self):
         progress = self.progress.get(time() * 1000)
-        self.threshold_high = self.p(self.min+0.1, self.max, self.e, progress)
+        self.threshold_high = self.p(self.min + 0.1, self.max, self.e, progress)
         self.threshold_acceptance = self.p(
-            self.min+0.1, self.max, self.e, progress) - (0.1*((progress+0.0000001)))
-        self.threshold_low = self.p(self.min+0.1, self.max, self.e, progress) - \
-            (0.1*((progress+0.0000001))) * abs(math.sin(progress * 60))
+            self.min + 0.1, self.max, self.e, progress
+        ) - (0.1 * (progress + 0.0000001))
+        self.threshold_low = self.p(self.min + 0.1, self.max, self.e, progress) - (
+            0.1 * (progress + 0.0000001)
+        ) * abs(math.sin(progress * 60))
 
     # ================================================================
     def get_domain_size(self, domain: Domain):
@@ -513,6 +540,7 @@ class LuckyAgent2022(DefaultParty):
         for issue in domain.getIssues():
             domain_size *= domain.getValues(issue).size()
         return domain_size
+
     # ================================================================
 
 
@@ -528,4 +556,4 @@ class BidDetail:
         return self.__utiltiy
 
     def __repr__(self) -> str:
-        return f'{self.__bid}: {self.__utiltiy}'
+        return f"{self.__bid}: {self.__utiltiy}"

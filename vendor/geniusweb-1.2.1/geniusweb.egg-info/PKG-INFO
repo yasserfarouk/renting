@@ -1,0 +1,18 @@
+Metadata-Version: 2.2
+Name: geniusweb
+Version: 1.2.1
+Summary: GeniusWeb glue code to connect python3 parties
+Home-page: https://tracinsy.ewi.tudelft.nl/pubtrac/GeniusWeb
+Author: W.Pasman
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Requires-Dist: pyson@ https://tracinsy.ewi.tudelft.nl/pubtrac/Utilities/export/312/pyson/dist/pyson-1.1.3.tar.gz
+Requires-Dist: utilities@ https://tracinsy.ewi.tudelft.nl/pubtrac/Utilities/export/314/utilitiespy/dist/utilities-1.0.5.tar.gz
+Requires-Dist: logging@ https://tracinsy.ewi.tudelft.nl/pubtrac/Utilities/export/226/loggingpy/dist/logging-1.0.0.tar.gz
+Requires-Dist: websocket-client==1.0.1
+Requires-Dist: PyQt5
+Dynamic: author
+Dynamic: classifier
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: summary

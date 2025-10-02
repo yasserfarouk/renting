@@ -1,5 +1,7 @@
 import random
 import time
+from rich import print
+from rich.progress import track
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -25,7 +27,7 @@ from torch import Tensor
 from environment.agents.geniusweb import AGENTS
 from environment.agents.policy.PPO import GNN, HigaEtAl
 from environment.negotiation import NegotiationEnvZoo
-from environment.scenario import Scenario
+from environment.scenario import ScenarioLoader
 
 MAP_DTYPE = {
     "int32": torch.int32,
@@ -44,11 +46,15 @@ class Policies(Enum):
 @dataclass
 class Args:
     debug: bool = False
-    deadline: int = 40
+    deadline: int = 100
+    time_limit: int = 10000
     policy: Policies = Policies.GNN
-    opponent: Literal["all", "random"] = "random"
-    opponent_sets: tuple[Literal["ANL2022","ANL2023","CSE3210","BASIC"], ...] = ("BASIC",)
-    scenario: str = "environment/scenarios/fixed_utility"
+    opponent: Literal["all", "random"] = "all"
+    opponent_sets: tuple[Literal["ANL2022", "ANL2023", "CSE3210", "BASIC"], ...] = (
+        "BASIC",
+    )
+    # scenario: str = "environment/scenarios/fixed_utility"
+    exp: str = "scml_dynamic"
     random_agent_order: bool = True
 
     # GNN policy settings
@@ -74,25 +80,27 @@ class Args:
     """the entity (team) of wandb's project"""
 
     # Algorithm specific arguments
-    total_timesteps: int = 2000000
+    # total_timesteps: int = 2_000_000
+    total_timesteps: int = 0  # 2000000
     """total timesteps of the experiments"""
-    learning_rate: float = 3e-4
-    """the learning rate of the optimizer"""
-    num_envs: int = 30
-    """the number of parallel game environments"""
     num_steps: int = 200
     """the number of steps to run in each environment per policy rollout"""
+    num_minibatches: int = 30
+    """the number of mini-batches"""
+    update_epochs: int = 30
+    """the K epochs to update the policy"""
+    learning_rate: float = 3e-4
+    """the learning rate of the optimizer"""
+    # num_envs: int = 30
+    num_envs: int = 2
+    """the number of parallel game environments"""
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
     gamma: float = 1
     """the discount factor gamma"""
     gae_lambda: float = 0.95
     """the lambda for the general advantage estimation"""
-    num_minibatches: int = 30
-    """the number of mini-batches"""
-    update_epochs: int = 30
-    """the K epochs to update the policy"""
-    norm_adv: bool = False #NOTE:?
+    norm_adv: bool = False  # NOTE:?
     """Toggles advantages normalization"""
     clip_coef: float = 0.3
     """the surrogate clipping coefficient"""
@@ -115,6 +123,26 @@ class Args:
     num_iterations: int = 0
     """the number of iterations (computed in runtime)"""
 
+    # extension parameters
+    issue_size = 0
+    """Maximum allowed number of values per issue"""
+    n_issues = 0
+    """Maximum allowed number of issues"""
+
+    def __post_init__(self):
+        self.scenario = f"environment/scenarios/random_tmp_{self.exp}"
+        if self.total_timesteps < 1:
+            if self.exp in ("scml_dynamic", "anac2024"):
+                self.total_timesteps = 400_000
+            elif self.exp in ("anac", "mipn"):
+                self.total_timesteps = 200_000
+            else:
+                self.total_timesteps = 400_000
+
+        # if self.exp == "scml_dynamic":
+        #     self.issue_size = max(self.issue_size, 20)
+        #     self.n_issues = max(self.n_issues, 3)
+
 
 def concat_envs(env_config, num_vec_envs, num_cpus=0):
     def vec_env_args(env, num_envs):
@@ -122,7 +150,12 @@ def concat_envs(env_config, num_vec_envs, num_cpus=0):
             env_copy = cloudpickle.loads(cloudpickle.dumps(env))
             env_copy.par_env.worker_id = worker_id
             return env_copy
-        return [partial(env_fn, i) for i in range(num_envs)], env.observation_space, env.action_space
+
+        return (
+            [partial(env_fn, i) for i in range(num_envs)],
+            env.observation_space,
+            env.action_space,
+        )
 
     env = NegotiationEnvZoo(env_config)
     vec_env = ss.pettingzoo_env_to_vec_env_v1(env)
@@ -142,16 +175,21 @@ def init_tensors(batch_size, envs, device) -> tuple[TensorDict, Tensor]:
         if isinstance(obs_space, MultiDiscrete):
             shape = (sum(obs_space.nvec),)
         elif isinstance(obs_space, Discrete):
-            shape = () #TODO, fix to one hot?
+            shape = ()  # TODO, fix to one hot?
         elif isinstance(obs_space, Box):
             shape = obs_space.shape
         else:
             raise NotImplementedError
-        obs[obs_key] = torch.zeros(batch_size + shape, dtype=MAP_DTYPE[str(obs_space.dtype)])
+        obs[obs_key] = torch.zeros(
+            batch_size + shape, dtype=MAP_DTYPE[str(obs_space.dtype)]
+        )
     obs: TensorDict = TensorDict(obs, batch_size=batch_size, device=device)
-    actions: torch.Tensor = torch.zeros(batch_size + envs.single_action_space.shape).to(device)
+    actions: torch.Tensor = torch.zeros(batch_size + envs.single_action_space.shape).to(
+        device
+    )
 
     return obs, actions
+
 
 def main():
     args = tyro.cli(Args)
@@ -165,10 +203,11 @@ def main():
         args.num_iterations = 2
         args.update_epochs = 1
 
-    run_name = f"{args.policy.name}_{datetime.now().strftime('%y-%m-%d_%H:%M:%S')}_{uuid4()}"
+    run_name = f"{args.policy.name}_{args.exp}.{datetime.now().strftime('%y-%m-%d_%H:%M:%S')}_{uuid4()}"
 
     if args.wandb:
         import wandb
+
         logger = wandb.init(
             entity="brenting",
             project=args.wandb_project_name,
@@ -176,7 +215,6 @@ def main():
             name=run_name,
             save_code=True,
         )
-    
 
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
@@ -185,20 +223,30 @@ def main():
     torch.backends.cudnn.deterministic = args.torch_deterministic
     scenario_rng = default_rng(args.seed)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() and args.cuda else "cpu")
+    device = torch.device(
+        "cuda:0" if torch.cuda.is_available() and args.cuda else "cpu"
+    )
 
     # env setup
     used_agents = [a for a in AGENTS if a.startswith(tuple(args.opponent_sets))]
     env_config = {
         "agents": [f"RL_{args.policy.name}", args.opponent],
         "used_agents": used_agents,
+        "exp": args.exp,
         "scenario": args.scenario,
-        "deadline": {"rounds": args.deadline, "ms": 10000},
+        "deadline": {"rounds": args.deadline, "ms": args.time_limit},
         "random_agent_order": args.random_agent_order,
+        "issue_size": args.issue_size,
+        "n_issues": args.n_issues,
     }
+
+    loader = ScenarioLoader(Path(f"environment/scenarios/{args.exp}"), random=True)
+    if args.scenario.startswith("environment/scenarios/random_tmp"):
+        scenario = loader.random_scenario()
+        scenario.to_directory(Path(args.scenario))
     envs = concat_envs(env_config, args.num_envs, num_cpus=args.num_envs)
 
-    agent: GNN = args.policy.value(envs, args).to(device)
+    agent: GNN = args.policy.value(envs, args).to(device)  # type: ignore
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     batch_size = (args.num_steps, args.num_envs)
@@ -211,12 +259,17 @@ def main():
     global_step = 0
     start_time = time.time()
 
-    for iteration in range(1, args.num_iterations + 1):
-        if args.scenario.startswith("environment/scenarios/random_tmp") or iteration == 1:
+    _strt = time.perf_counter()
+    for iteration in track(range(1, args.num_iterations + 1)):
+        if (
+            args.scenario.startswith("environment/scenarios/random_tmp")
+            or iteration == 1
+        ):
             if args.scenario.startswith("environment/scenarios/random_tmp"):
-                scenario = Scenario.create_random([200, 1000], scenario_rng, 5, True)
+                scenario = loader.next_scenario()
+                # scenario = Scenario.create_random([200, 1000], scenario_rng, 5, True)
                 scenario.to_directory(Path(args.scenario))
-            
+
             envs = concat_envs(env_config, args.num_envs, num_cpus=args.num_envs)
             agent.action_nvec = tuple(envs.single_action_space.nvec)
             obs, actions = init_tensors(batch_size, envs, device)
@@ -231,9 +284,9 @@ def main():
             lrnow = frac * args.learning_rate
             optimizer.param_groups[0]["lr"] = lrnow
 
-        utility_all_agents = defaultdict(lambda: .0)
+        utility_all_agents = defaultdict(lambda: 0.0)
         count_all_agents = defaultdict(lambda: 0)
-        log_metrics = defaultdict(lambda: [.0, 0])
+        log_metrics = defaultdict(lambda: [0.0, 0])
         for step in range(0, args.num_steps):
             global_step += args.num_envs
             obs[step] = next_obs
@@ -247,10 +300,15 @@ def main():
             logprobs[step] = logprob
 
             # TRY NOT TO MODIFY: execute the game and log data.
-            next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy())
+            next_obs, reward, terminations, truncations, infos = envs.step(
+                action.cpu().numpy()
+            )
             next_done_bool = np.logical_or(terminations, truncations)
             rewards[step] = torch.tensor(reward).to(device).view(-1)
-            next_obs, next_done = TensorDict(next_obs, batch_size=(args.num_envs,), device=device), torch.Tensor(next_done_bool).to(device)
+            next_obs, next_done = (
+                TensorDict(next_obs, batch_size=(args.num_envs,), device=device),
+                torch.Tensor(next_done_bool).to(device),
+            )
 
             if next_done_bool.any():
                 for info in infos:
@@ -266,13 +324,16 @@ def main():
                         log_metrics["found_agreement"][1] += 1
                 log_metrics["episode_reward_mean"][0] += reward[next_done_bool].sum()
                 log_metrics["episode_reward_mean"][1] += next_done_bool.sum()
-        
+
         if args.wandb:
             for metric, (value, count) in log_metrics.items():
                 logger.log({metric: value / count}, step=global_step)
                 print(f"{metric}: {value / count}")
             for agent_id, utility in utility_all_agents.items():
-                logger.log({f"utility/{agent_id}": utility / count_all_agents[agent_id]}, step=global_step)
+                logger.log(
+                    {f"utility/{agent_id}": utility / count_all_agents[agent_id]},
+                    step=global_step,
+                )
 
         # bootstrap value if not done
         with torch.no_grad():
@@ -286,8 +347,12 @@ def main():
                 else:
                     nextnonterminal = 1.0 - dones[t + 1]
                     nextvalues = values[t + 1]
-                delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
-                advantages[t] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+                delta = (
+                    rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
+                )
+                advantages[t] = lastgaelam = (
+                    delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+                )
             returns = advantages + values
 
         # flatten the batch
@@ -307,7 +372,9 @@ def main():
                 end = start + args.minibatch_size
                 mb_inds = b_inds[start:end]
 
-                _, newlogprob, entropy, newvalue = agent.get_action_and_value(b_obs[mb_inds], b_actions.long()[mb_inds])
+                _, newlogprob, entropy, newvalue = agent.get_action_and_value(
+                    b_obs[mb_inds], b_actions.long()[mb_inds]
+                )
                 logratio = newlogprob - b_logprobs[mb_inds]
                 ratio = logratio.exp()
 
@@ -315,21 +382,29 @@ def main():
                     # calculate approx_kl http://joschu.net/blog/kl-approx.html
                     old_approx_kl = (-logratio).mean()
                     approx_kl = ((ratio - 1) - logratio).mean()
-                    clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
+                    clipfracs += [
+                        ((ratio - 1.0).abs() > args.clip_coef).float().mean().item()
+                    ]
 
                 mb_advantages = b_advantages[mb_inds]
                 if args.norm_adv:
-                    mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
+                    mb_advantages = (mb_advantages - mb_advantages.mean()) / (
+                        mb_advantages.std() + 1e-8
+                    )
 
                 # Policy loss
                 pg_loss1 = -mb_advantages * ratio
-                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
-                pg_loss = torch.max(pg_loss1, pg_loss2).mean() #NOTE: identical
+                pg_loss2 = -mb_advantages * torch.clamp(
+                    ratio, 1 - args.clip_coef, 1 + args.clip_coef
+                )
+                pg_loss = torch.max(pg_loss1, pg_loss2).mean()  # NOTE: identical
 
                 # Value loss
                 newvalue = newvalue.view(-1)
                 if args.clip_vloss:
-                    v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2 #NOTE: log clips, clip vloss directly
+                    v_loss_unclipped = (
+                        newvalue - b_returns[mb_inds]
+                    ) ** 2  # NOTE: log clips, clip vloss directly
                     v_clipped = b_values[mb_inds] + torch.clamp(
                         newvalue - b_values[mb_inds],
                         -args.clip_coef,
@@ -347,12 +422,13 @@ def main():
 
                 optimizer.zero_grad()
                 loss.backward()
-                total_norm = nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm)
+                total_norm = nn.utils.clip_grad_norm_(
+                    agent.parameters(), args.max_grad_norm
+                )
                 optimizer.step()
 
             if args.target_kl is not None and approx_kl > args.target_kl:
                 break
-            
 
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
@@ -361,8 +437,13 @@ def main():
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         if args.wandb:
             logger.log({"learning_rate": optimizer.param_groups[0]["lr"]}, global_step)
-            logger.log({"losses/unclipped_value": newvalue.detach().mean().cpu().numpy()}, global_step)
-            logger.log({"losses/gradient_norm": total_norm.detach().cpu().numpy()}, global_step)
+            logger.log(
+                {"losses/unclipped_value": newvalue.detach().mean().cpu().numpy()},
+                global_step,
+            )
+            logger.log(
+                {"losses/gradient_norm": total_norm.detach().cpu().numpy()}, global_step
+            )
             logger.log({"losses/total_loss": loss.item()}, global_step)
             logger.log({"losses/value_loss": v_loss.item()}, global_step)
             logger.log({"losses/policy_loss": pg_loss.item()}, global_step)
@@ -371,19 +452,24 @@ def main():
             logger.log({"losses/approx_kl": approx_kl.item()}, global_step)
             logger.log({"losses/clipfrac": np.mean(clipfracs)}, global_step)
             logger.log({"losses/explained_variance": explained_var}, global_step)
-            logger.log({"SPS": int(global_step / (time.time() - start_time))}, global_step)
+            logger.log(
+                {"SPS": int(global_step / (time.time() - start_time))}, global_step
+            )
         print("SPS:", int(global_step / (time.time() - start_time)))
-
         model_path = f"models/{run_name}"
+        print(f"Will save the model to {model_path}")
+
         torch.save(agent.state_dict(), model_path)
 
     envs.close()
-    
+    total_time = time.perf_counter() - _strt
+
     if args.wandb:
-        artifact = wandb.Artifact("model", type="model")
-        artifact.add_file(model_path)
-        logger.log_artifact(artifact)
-        logger.finish()
+        artifact = wandb.Artifact("model", type="model")  # type: ignore
+        artifact.add_file(model_path)  # type: ignore
+        logger.log_artifact(artifact)  # type: ignore
+        logger.finish()  # type: ignore
+    print(f"Total time: {total_time:.3f} seconds")
 
 
 if __name__ == "__main__":

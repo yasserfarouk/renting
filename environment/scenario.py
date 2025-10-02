@@ -1,3 +1,5 @@
+from dataclasses import dataclass, field
+from random import shuffle, choice
 import json
 import math
 from itertools import product
@@ -5,6 +7,7 @@ from math import sqrt
 from pathlib import Path
 from shutil import rmtree
 from typing import Iterable
+from uuid import uuid4
 
 import numpy as np
 import plotly.graph_objects as go
@@ -12,22 +15,47 @@ from numpy.random import Generator, default_rng
 
 
 class UtilityFunction:
-    def __init__(self, objective_weights: dict, value_weights: dict[str, dict]):
+    def __init__(
+        self,
+        objective_weights: dict,
+        value_weights: dict[str, dict],
+        reserved_value: float = 0.0,
+        name: str | None = None,
+        path: str | Path | None = None,
+    ):
         self.objective_weights = objective_weights
         self.value_weights = value_weights
+        self.reserved_value = reserved_value
+        if name is None:
+            self.name = str(uuid4())
+        else:
+            self.name = name
+        self.path = str(path) if path else None
 
     @classmethod
     def from_file(cls, file: Path):
         with open(file, "r") as f:
-            #TODO: this is ugly, maybe move to a vector based solution
+            # TODO: this is ugly, maybe move to a vector based solution
             weights = json.load(f)
-            weights["objective_weights"] = {int(k): v for k, v in weights["objective_weights"].items()}
-            weights["value_weights"] = {int(k1): {int(k2): v2 for k2, v2 in v1.items()} for k1, v1 in weights["value_weights"].items()}
+            weights["objective_weights"] = {
+                int(k): v for k, v in weights["objective_weights"].items()
+            }
+            weights["value_weights"] = {
+                int(k1): {int(k2): v2 for k2, v2 in v1.items()}
+                for k1, v1 in weights["value_weights"].items()
+            }
 
         objective_weights = weights["objective_weights"]
         value_weights = weights["value_weights"]
+        reserved_value = weights.get("reserved_value", 0.0)
 
-        return cls(objective_weights, value_weights)
+        return cls(
+            objective_weights,
+            value_weights,
+            reserved_value=reserved_value,
+            name=weights.get("name", "") + f"@{file.stem}",
+            path=str(file),
+        )
 
     @classmethod
     def create_random(cls, objectives: dict, np_random: Generator):
@@ -56,15 +84,21 @@ class UtilityFunction:
         weights = {
             "objective_weights": self.objective_weights,
             "value_weights": self.value_weights,
+            "reserved_value": self.reserved_value,
         }
         with open(file, "w") as f:
             f.write(json.dumps(weights, indent=2))
 
     def get_utility(self, outcome: list | tuple):
+        if outcome is None or len(outcome) == 0:
+            return self.reserved_value
+
         return sum(
-            self.objective_weights[o] * self.value_weights[o][v] for o, v in enumerate(outcome)
+            self.objective_weights.get(o, 0.0)
+            * self.value_weights.get(o, dict()).get(v, 0.0)
+            for o, v in enumerate(outcome)
         )
-    
+
     @property
     def max_utility_outcome(self):
         return [max(vw, key=vw.get) for vw in self.value_weights.values()]
@@ -82,8 +116,13 @@ class Scenario:
         distribution=None,
         opposition=None,
         visualisation=None,
+        name: str = None,
+        src_path: str | Path = None,
+        load_path: str | Path = None,
     ):
-        assert not utility_functions or len(utility_functions) == 2 #NOTE: Force 2 sides for now
+        assert (
+            not utility_functions or len(utility_functions) == 2
+        )  # NOTE: Force 2 sides for now
         self.objectives = objectives
         self.utility_functions = utility_functions
         self.SW_outcome = SW_outcome
@@ -93,9 +132,21 @@ class Scenario:
         self.distribution = distribution
         self.opposition = opposition
         self.visualisation = visualisation
+        if name is None:
+            self.name = str(uuid4())
+        else:
+            self.name = name
+        self.src_path = str(src_path) if src_path else None
+        self.load_path = str(load_path) if load_path else None
 
     @classmethod
-    def create_random(cls, size, np_random: Generator, max_values: int = 20, no_utility_functions=False):
+    def create_random(
+        cls,
+        size,
+        np_random: Generator,
+        max_values: int = 20,
+        no_utility_functions=False,
+    ):
         if isinstance(size, int):
             size = size
         elif isinstance(size, list):
@@ -109,15 +160,21 @@ class Scenario:
             multiplier = (size / np.prod(spread)) ** (1.0 / num_objectives)
             values_per_objective = np.round(multiplier * spread).astype(np.int64)
             values_per_objective = np.clip(values_per_objective, 2, max_values)
-            if (abs(size - np.prod(values_per_objective)) < (0.1 * size)) and values_per_objective.sum() < 1000:
+            if (
+                abs(size - np.prod(values_per_objective)) < (0.1 * size)
+            ) and values_per_objective.sum() < 1000:
                 break
 
-        objectives = {i: [v for v in range(vs)] for i, vs in enumerate(values_per_objective)}
+        objectives = {
+            i: [v for v in range(vs)] for i, vs in enumerate(values_per_objective)
+        }
 
         if no_utility_functions:
             return cls(objectives)
 
-        utility_functions = [UtilityFunction.create_random(objectives, np_random) for _ in range(2)]
+        utility_functions = [
+            UtilityFunction.create_random(objectives, np_random) for _ in range(2)
+        ]
         return cls(objectives, utility_functions)
 
     @classmethod
@@ -137,18 +194,28 @@ class Scenario:
                 return cls(
                     objectives,
                     utility_functions,
-                    SW_outcome=specials["social_welfare"],
-                    nash_outcome=specials["nash"],
-                    kalai_outcome=specials["kalai"],
-                    pareto_front=specials["pareto_front"],
-                    distribution=specials["distribution"],
-                    opposition=specials["opposition"],
+                    SW_outcome=specials.get("social_welfare", None),
+                    nash_outcome=specials.get("nash", None),
+                    kalai_outcome=specials.get("kalai", None),
+                    pareto_front=specials.get("pareto_front", None),
+                    distribution=specials.get("distribution", None),
+                    opposition=specials.get("opposition", None),
+                    name=specials.get("name", None),
+                    src_path=specials.get("src_path", directory),
+                    load_path=directory,
                 )
         else:
-            utility_functions = [UtilityFunction.create_random(objectives, np_random) for _ in range(2)]
+            utility_functions = [
+                UtilityFunction.create_random(objectives, np_random) for _ in range(2)
+            ]
 
-
-        return cls(objectives, utility_functions)
+        return cls(
+            objectives,
+            utility_functions,
+            name=directory.name,
+            src_path=None,
+            load_path=directory,
+        )
 
     def calculate_specials(self):
         if self.nash_outcome:
@@ -161,7 +228,10 @@ class Scenario:
         kalai_diff = 10
 
         for pareto_outcome in self.pareto_front:
-            utility_A, utility_B = pareto_outcome["utility"][0], pareto_outcome["utility"][1]
+            utility_A, utility_B = (
+                pareto_outcome["utility"][0],
+                pareto_outcome["utility"][1],
+            )
 
             utility_diff = abs(utility_A - utility_B)
             utility_prod = utility_A * utility_B
@@ -181,7 +251,9 @@ class Scenario:
         return True
 
     def generate_visualisation(self):
-        outcome_utils = [self.get_utilities(outcome) for outcome in self.iter_outcomes()]
+        outcome_utils = [
+            self.get_utilities(outcome) for outcome in self.iter_outcomes()
+        ]
         outcome_utils = list(zip(*outcome_utils))
 
         fig = go.Figure()
@@ -283,13 +355,30 @@ class Scenario:
                             "nash": self.nash_outcome,
                             "kalai": self.kalai_outcome,
                             "pareto_front": self.pareto_front,
+                            "name": self.name,
+                            "src_path": self.src_path,
+                            "load_path": self.load_path,
+                        },
+                        indent=2,
+                    )
+                )
+        else:
+            with open(directory / "specials.json", "w") as f:
+                f.write(
+                    json.dumps(
+                        {
+                            "name": self.name,
+                            "src_path": self.src_path,
+                            "load_path": self.load_path,
                         },
                         indent=2,
                     )
                 )
 
         if self.visualisation:
-            self.visualisation.write_image(file=directory / "visualisation.pdf", scale=5)
+            self.visualisation.write_image(
+                file=directory / "visualisation.pdf", scale=5
+            )
 
     def iter_outcomes(self) -> Iterable:
         return iter(self)
@@ -322,7 +411,7 @@ class Scenario:
                 pareto_front.append(
                     {
                         "outcome": candidate_outcome,
-                        "utility": self.get_utilities(candidate_outcome)
+                        "utility": self.get_utilities(candidate_outcome),
                     }
                 )
 
@@ -397,3 +486,35 @@ class Scenario:
         outcomes_values = product(*self.objectives.values())
         for outcome_values in outcomes_values:
             yield outcome_values
+
+
+@dataclass
+class ScenarioLoader:
+    path: Path
+    nxt: int = 0
+    random: bool = False
+    _files: list[Path] = field(init=False, default_factory=list)
+
+    def __post_init__(self):
+        assert self.path.exists() and self.path.is_dir()
+        self._files = [f for f in self.path.iterdir() if f.is_dir()]
+        if self.random:
+            shuffle(self._files)
+        else:
+            self._files.sort()
+
+    def __iter__(self):
+        return self.next_scenario()
+
+    def __len__(self):
+        return len(self._files)
+
+    def next_scenario(self):
+        """Next scenario"""
+        s = self._files[self.nxt]
+        self.nxt = (self.nxt + 1) % len(self._files)
+        return Scenario.from_directory(s)
+
+    def random_scenario(self):
+        """samples a random scenario with replacement"""
+        return Scenario.from_directory(choice(self._files))

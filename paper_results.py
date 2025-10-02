@@ -17,54 +17,67 @@ from tensordict import TensorDict
 
 from environment.agents.geniusweb import AGENTS
 from environment.agents.policy.PPO import GNN
-from environment.scenario import Scenario
+from environment.scenario import ScenarioLoader
 from ppo import Args, Policies, concat_envs
 
 pio.kaleido.scope.mathjax = None
 
 TESTS = [
     {
-        "name": "GNN_basic_random_on_basic_random",
+        "name": "scml_dynamic",
         "module": "GNN",
-        "models": [str(i) for i in Path("models", "GNN", "basic_opponents_random_scenarios").iterdir()],
-        "scenario": f"environment/scenarios/random_tmp_GNN_basic_random_on_basic_random_{uuid4()}",
+        "models": [
+            str(i)
+            for i in Path("models", "GNN", "basic_opponents_random_scenarios").iterdir()
+        ],
+        "scenario": f"environment/scenarios/random_tmp_scml_dynamic{uuid4()}",
         "opponent_sets": ("BASIC",),
     },
-    {
-        "name": "GNN_all_random_on_all_random",
-        "module": "GNN",
-        "models": [str(i) for i in Path("models", "GNN", "all_opponents_random_scenarios").iterdir()],
-        "scenario": f"environment/scenarios/random_tmp_GNN_all_random_on_all_random_{uuid4()}",
-        "opponent_sets": ("ANL2022", "ANL2023", "BASIC"),
-    },
-    {
-        "name": "GNN_basic_fixed_on_basic_fixed",
-        "module": "GNN",
-        "models": [str(i) for i in Path("models", "GNN", "basic_opponents_fixed_scenario").iterdir()],
-        "scenario": "environment/scenarios/fixed_utility",
-        "opponent_sets": ("BASIC",),
-    },
-    {
-        "name": "GNN_all_fixed_on_all_fixed",
-        "module": "GNN",
-        "models": [str(i) for i in Path("models", "GNN", "all_opponents_fixed_scenario").iterdir()],
-        "scenario": "environment/scenarios/fixed_utility",
-        "opponent_sets": ("ANL2022", "ANL2023", "BASIC"),
-    },
-    {
-        "name": "Higa_basic_fixed_on_basic_fixed",
-        "module": "HigaEtAl",
-        "models": [str(i) for i in Path("models", "HigaEtAl", "basic_opponents_fixed_scenario").iterdir()],
-        "scenario": "environment/scenarios/fixed_utility",
-        "opponent_sets": ("BASIC",),
-    },
-    {
-        "name": "Higa_all_fixed_on_all_fixed",
-        "module": "HigaEtAl",
-        "models": [str(i) for i in Path("models", "HigaEtAl", "all_opponents_fixed_scenario").iterdir()],
-        "scenario": "environment/scenarios/fixed_utility",
-        "opponent_sets": ("ANL2022", "ANL2023", "BASIC"),
-    },
+    # {
+    #     "name": "GNN_basic_random_on_basic_random",
+    #     "module": "GNN",
+    #     "models": [
+    #         str(i)
+    #         for i in Path("models", "GNN", "basic_opponents_random_scenarios").iterdir()
+    #     ],
+    #     "scenario": f"environment/scenarios/random_tmp_GNN_basic_random_on_basic_random_{uuid4()}",
+    #     "opponent_sets": ("BASIC",),
+    # },
+    # {
+    #     "name": "GNN_all_random_on_all_random",
+    #     "module": "GNN",
+    #     "models": [str(i) for i in Path("models", "GNN", "all_opponents_random_scenarios").iterdir()],
+    #     "scenario": f"environment/scenarios/random_tmp_GNN_all_random_on_all_random_{uuid4()}",
+    #     "opponent_sets": ("ANL2022", "ANL2023", "BASIC"),
+    # },
+    # {
+    #     "name": "GNN_basic_fixed_on_basic_fixed",
+    #     "module": "GNN",
+    #     "models": [str(i) for i in Path("models", "GNN", "basic_opponents_fixed_scenario").iterdir()],
+    #     "scenario": "environment/scenarios/fixed_utility",
+    #     "opponent_sets": ("BASIC",),
+    # },
+    # {
+    #     "name": "GNN_all_fixed_on_all_fixed",
+    #     "module": "GNN",
+    #     "models": [str(i) for i in Path("models", "GNN", "all_opponents_fixed_scenario").iterdir()],
+    #     "scenario": "environment/scenarios/fixed_utility",
+    #     "opponent_sets": ("ANL2022", "ANL2023", "BASIC"),
+    # },
+    # {
+    #     "name": "Higa_basic_fixed_on_basic_fixed",
+    #     "module": "HigaEtAl",
+    #     "models": [str(i) for i in Path("models", "HigaEtAl", "basic_opponents_fixed_scenario").iterdir()],
+    #     "scenario": "environment/scenarios/fixed_utility",
+    #     "opponent_sets": ("BASIC",),
+    # },
+    # {
+    #     "name": "Higa_all_fixed_on_all_fixed",
+    #     "module": "HigaEtAl",
+    #     "models": [str(i) for i in Path("models", "HigaEtAl", "all_opponents_fixed_scenario").iterdir()],
+    #     "scenario": "environment/scenarios/fixed_utility",
+    #     "opponent_sets": ("ANL2022", "ANL2023", "BASIC"),
+    # },
 ]
 
 
@@ -72,6 +85,7 @@ TESTS = [
 class ArgsEval(Args):
     test_num: int | None = None
     model_paths: tuple[str, ...] | None = None
+    exp: str = "scml_dynamic"
 
     episodes_per_agent: int = 1000
     episodes_per_scenario_per_agent: int = 20
@@ -91,7 +105,9 @@ def main():
     torch.backends.cudnn.deterministic = args.torch_deterministic
     scenario_rng = default_rng(args.seed)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() and args.cuda else "cpu")
+    device = torch.device(
+        "cuda:0" if torch.cuda.is_available() and args.cuda else "cpu"
+    )
 
     # env setup
     used_agents = [a for a in AGENTS if a.startswith(tuple(test_data["opponent_sets"]))]
@@ -104,25 +120,46 @@ def main():
 
     iterables = [list(range(len(test_data["models"]))), sorted(used_agents)]
     index = pd.MultiIndex.from_product(iterables, names=["model", "opponent"])
-    data = pd.DataFrame(columns=["my_utility", "opp_utility", "count", "rounds_played", "self_accepted", "found_agreement"], index=index)
+    data = pd.DataFrame(
+        columns=[
+            "my_utility",
+            "opp_utility",
+            "count",
+            "rounds_played",
+            "self_accepted",
+            "found_agreement",
+        ],
+        index=index,
+    )
 
+    loader = ScenarioLoader(
+        Path(f"environment/scenarios/{args.exp}_testing"), random=False
+    )
     for model_index, model_path in enumerate(test_data["models"]):
         print(f"model_index: {model_index}")
         agent_type = model_path.split("/")[1].split("_")[0]
 
         episodes = 0
         iteration = 0
-        log_metrics = defaultdict(lambda: defaultdict(lambda: .0))
+        log_metrics = defaultdict(lambda: defaultdict(lambda: 0.0))
+
+        details_ = []
         # TRY NOT TO MODIFY: start the game
         while episodes < args.episodes:
-            if test_data["scenario"].startswith("environment/scenarios/random_tmp") or iteration == 0:
+            if (
+                test_data["scenario"].startswith("environment/scenarios/random_tmp")
+                or iteration == 0
+            ):
                 if test_data["scenario"].startswith("environment/scenarios/random_tmp"):
-                    scenario = Scenario.create_random([200, 1000], scenario_rng, 5, True)
+                    scenario = loader.next_scenario()
+                    # scenario = Scenario.create_random(
+                    #     [200, 1000], scenario_rng, 5, True
+                    # )
                     scenario.to_directory(Path(test_data["scenario"]))
-                
+
                 if envs:
                     envs.close()
-            
+
                 env_config = {
                     "agents": [f"RL_{agent_type}", args.opponent],
                     "used_agents": used_agents,
@@ -137,20 +174,25 @@ def main():
                 agent.action_nvec = tuple(envs.single_action_space.nvec)
 
                 next_obs, _ = envs.reset(seed=args.seed + iteration)
-                next_obs = TensorDict(next_obs, batch_size=(args.num_envs,), device=device)
+                next_obs = TensorDict(
+                    next_obs, batch_size=(args.num_envs,), device=device
+                )
 
             episodes_on_this_scenario = 0
             print(episodes)
             while episodes_on_this_scenario < args.episodes_per_scenario:
-
                 # ALGO LOGIC: action logic
                 with torch.no_grad():
                     action, _, _, _ = agent.get_action_and_value(next_obs)
 
                 # TRY NOT TO MODIFY: execute the game and log data.
-                next_obs, _, terminations, truncations, infos = envs.step(action.cpu().numpy())
+                next_obs, _, terminations, truncations, infos = envs.step(
+                    action.cpu().numpy()
+                )
                 next_done_bool = np.logical_or(terminations, truncations)
-                next_obs = TensorDict(next_obs, batch_size=(args.num_envs,), device=device)
+                next_obs = TensorDict(
+                    next_obs, batch_size=(args.num_envs,), device=device
+                )
 
                 if next_done_bool.any():
                     for info in infos:
@@ -158,23 +200,41 @@ def main():
                             for agent_id, utility in info["utility_all_agents"].items():
                                 if agent_id != f"RL_{test_data['module']}":
                                     log_metrics[agent_id]["opp_utility"] += utility
-                                    log_metrics[agent_id]["my_utility"] += info["utility_all_agents"][f"RL_{test_data['module']}"]
+                                    log_metrics[agent_id]["my_utility"] += info[
+                                        "utility_all_agents"
+                                    ][f"RL_{test_data['module']}"]
                                     log_metrics[agent_id]["count"] += 1
-                                    log_metrics[agent_id]["rounds_played"] += info["rounds_played"]
-                                    log_metrics[agent_id]["self_accepted"] += info["self_accepted"]
-                                    log_metrics[agent_id]["found_agreement"] += info["found_agreement"]
+                                    log_metrics[agent_id]["rounds_played"] += info[
+                                        "rounds_played"
+                                    ]
+                                    log_metrics[agent_id]["self_accepted"] += info[
+                                        "self_accepted"
+                                    ]
+                                    log_metrics[agent_id]["found_agreement"] += info[
+                                        "found_agreement"
+                                    ]
+                                    details += info | dict(
+                                        learner_utility=info["utility_all_agents"][
+                                            f"RL_{test_data['module']}"
+                                        ],
+                                        opp_utility=utility,
+                                        episode=episodes,
+                                        episodes_on_this_scenario=episodes_on_this_scenario,
+                                    )
                                     episodes += 1
                                     episodes_on_this_scenario += 1
             iteration += 1
-
 
         for opp_id, values in log_metrics.items():
             result = {k: v / values["count"] for k, v in values.items() if k != "count"}
             result["count"] = values["count"]
             data.loc[(model_index, opp_id), result.keys()] = list(result.values())
 
-
     data.to_csv(results_dir / f"{test_data['name']}.csv")
+
+    pd.DataFrame.from_records(details).to_csv(
+        results_dir / f"details_{test_data['name']}.csv", index=False
+    )
     data_plot = pd.read_csv(results_dir / f"{test_data['name']}.csv", index_col=[0, 1])
     plot_results(data_plot, test_data["name"])
 
@@ -185,8 +245,8 @@ def confidence_interval(data, confidence=0.99):
         print(f"found {nans} NaNs")
     data = [d for d in data if not np.isnan(d)]
     dist = NormalDist.from_samples(data)
-    z = NormalDist().inv_cdf((1 + confidence) / 2.)
-    h = dist.stdev * z / ((len(data) - 1) ** .5)
+    z = NormalDist().inv_cdf((1 + confidence) / 2.0)
+    h = dist.stdev * z / ((len(data) - 1) ** 0.5)
     return h
 
 
@@ -249,8 +309,8 @@ def plot_results(data, name):
     width = len(x) * 25 + 100
     fig.update_layout(
         barmode="group",
-        width=width * (1/0.6),
-        height=175 * (1/0.6),
+        width=width * (1 / 0.6),
+        height=175 * (1 / 0.6),
         font=dict(
             family="serif",
         ),
@@ -266,7 +326,7 @@ def plot_results(data, name):
         yaxis=dict(
             title="Utility",
             range=[0, 1.1],
-            dtick = 0.1,
+            dtick=0.1,
         ),
         legend=dict(orientation="h", yanchor="bottom", y=1, xanchor="right", x=1),
     )

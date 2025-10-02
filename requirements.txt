@@ -1,4 +1,4 @@
-https://tracinsy.ewi.tudelft.nl/pubtrac/GeniusWebPython/export/100/geniuswebcore/dist/geniusweb-1.2.1.tar.gz
+rich
 torch==2.2.0
 torchvision==0.17.0
 torch_geometric==2.4.0
@@ -13,5 +13,6 @@ pettingzoo==1.24.3
 supersuit==3.9.2
 tyro==0.7.2
 pandas==2.2.0
+https://tracinsy.ewi.tudelft.nl/pubtrac/GeniusWebPython/export/100/geniuswebcore/dist/geniusweb-1.2.1.tar.gz
 pytest
 -f https://data.pyg.org/whl/torch-2.2.0+cu121.html
