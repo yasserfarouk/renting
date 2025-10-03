@@ -1,0 +1,150 @@
+{
+  "distribution": null,
+  "kalai": {
+    "outcome": [
+      "Baguette",
+      "Pears",
+      "Doughnuts",
+      "Jam",
+      "Spinach"
+    ],
+    "utility": [
+      [
+        0.8222222222222222,
+        0.8833333333333333
+      ]
+    ]
+  },
+  "load_path": null,
+  "name": "0001600Grocery",
+  "nash": {
+    "outcome": [
+      "Baguette",
+      "Pears",
+      "Doughnuts",
+      "Jam",
+      "Spinach"
+    ],
+    "utility": [
+      [
+        0.8222222222222222,
+        0.8833333333333333
+      ]
+    ]
+  },
+  "opposition": 0.21264065787782935,
+  "pareto_front": [
+    {
+      "outcome": [
+        "Baguette",
+        "Pears",
+        "Doughnuts",
+        "Jam",
+        "Spinach"
+      ],
+      "utility": [
+        0.8222222222222222,
+        0.8833333333333333
+      ]
+    },
+    {
+      "outcome": [
+        "Baguette",
+        "Pears",
+        "Doughnuts",
+        "Peanut butter",
+        "Spinach"
+      ],
+      "utility": [
+        0.9555555555555555,
+        0.7499999999999999
+      ]
+    },
+    {
+      "outcome": [
+        "Baguette",
+        "Pears",
+        "Doughnuts",
+        "Sandwichspread",
+        "Spinach"
+      ],
+      "utility": [
+        0.8722222222222222,
+        0.7999999999999999
+      ]
+    },
+    {
+      "outcome": [
+        "Baguette",
+        "Pears",
+        "Doughnuts",
+        "Jam",
+        "Leek"
+      ],
+      "utility": [
+        0.6555555555555554,
+        0.9166666666666666
+      ]
+    },
+    {
+      "outcome": [
+        "Baguette",
+        "Pears",
+        "Doughnuts",
+        "Jam",
+        "Potatoes"
+      ],
+      "utility": [
+        0.5888888888888888,
+        0.9722222222222222
+      ]
+    },
+    {
+      "outcome": [
+        "Baguette",
+        "Pears",
+        "Popcorn",
+        "Peanut butter",
+        "Spinach"
+      ],
+      "utility": [
+        1.0,
+        0.4722222222222222
+      ]
+    },
+    {
+      "outcome": [
+        "Baguette",
+        "Apples",
+        "Doughnuts",
+        "Jam",
+        "Potatoes"
+      ],
+      "utility": [
+        0.38888888888888884,
+        1.0
+      ]
+    }
+  ],
+  "size": 1600,
+  "social_welfare": {
+    "outcome": [
+      "Baguette",
+      "Pears",
+      "Doughnuts",
+      "Jam",
+      "Spinach"
+    ],
+    "utility": [
+      [
+        0.8222222222222222,
+        0.8833333333333333
+      ],
+      [
+        0.9555555555555555,
+        0.7499999999999999
+      ]
+    ]
+  },
+  "src_path": "environment/scenarios/testing_src/grocery/0001600Grocery"
+}

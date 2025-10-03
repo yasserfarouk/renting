@@ -1,0 +1,44 @@
+<utility_space type="any" number_of_issues="3">
+<objective index="1" etype="objective" type="objective" description="" name="any">
+<issue index="1" etype="discrete" type="discrete" vtype="discrete" name="i1">
+    <item index="1" value="v1" evaluation="0.6185423820488873" />
+    <item index="2" value="v2" evaluation="0.0" />
+    <item index="3" value="v3" evaluation="0.309432790977991" />
+    <item index="4" value="v4" evaluation="0.0" />
+    <item index="5" value="v5" evaluation="1.0" />
+    <item index="6" value="v6" evaluation="0.2119437948604666" />
+    <item index="7" value="v7" evaluation="0.2933125218999149" />
+    <item index="8" value="v8" evaluation="0.8571428571428571" />
+    <item index="9" value="v9" evaluation="0.858175719796559" />
+</issue>
+<issue index="2" etype="discrete" type="discrete" vtype="discrete" name="i2">
+    <item index="1" value="v1" evaluation="1.0" />
+    <item index="2" value="v2" evaluation="0.5197661839670283" />
+    <item index="3" value="v3" evaluation="0.43246992849378285" />
+    <item index="4" value="v4" evaluation="0.11227079272518602" />
+    <item index="5" value="v5" evaluation="0.8571428571428571" />
+    <item index="6" value="v6" evaluation="0.0" />
+    <item index="7" value="v7" evaluation="0.29000395335153295" />
+    <item index="8" value="v8" evaluation="0.0" />
+    <item index="9" value="v9" evaluation="0.8467873323534141" />
+</issue>
+<issue index="3" etype="discrete" type="discrete" vtype="discrete" name="i3">
+    <item index="1" value="v1" evaluation="0.3124727066142356" />
+    <item index="2" value="v2" evaluation="0.5111988543939197" />
+    <item index="3" value="v3" evaluation="0.22607005787524392" />
+    <item index="4" value="v4" evaluation="0.46870905992135337" />
+    <item index="5" value="v5" evaluation="1.0" />
+    <item index="6" value="v6" evaluation="0.46870905992135337" />
+    <item index="7" value="v7" evaluation="0.0" />
+    <item index="8" value="v8" evaluation="0.0" />
+    <item index="9" value="v9" evaluation="1.0" />
+</issue>
+<weight index="1" value="0.17200314836378242">
+</weight>
+<weight index="2" value="0.778457894448058">
+</weight>
+<weight index="3" value="0.04953895718815944">
+</weight>
+</objective>
+<reservation value="0.4915005169981337" />
+</utility_space>

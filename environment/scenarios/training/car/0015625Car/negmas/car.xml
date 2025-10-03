@@ -1,0 +1,78 @@
+<negotiation_template>
+<utility_space number_of_issues="6">
+<objective description="" etype="objective" index="0" name="root" type="objective">
+    <issue etype="discrete" index="1" name="CD player" type="discrete" vtype="discrete">
+        <item index="1" value="good" cost="0" description="good">
+        </item>
+        <item index="2" value="fairly good" cost="0" description="fairly good">
+        </item>
+        <item index="3" value="standard" cost="0" description="standard">
+        </item>
+        <item index="4" value="meager" cost="0" description="meager">
+        </item>
+        <item index="5" value="none" cost="0" description="none">
+        </item>
+    </issue>
+    <issue etype="discrete" index="2" name="Extra speakers" type="discrete" vtype="discrete">
+        <item index="1" value="good" cost="0" description="good">
+        </item>
+        <item index="2" value="fairly good" cost="0" description="fairly good">
+        </item>
+        <item index="3" value="standard" cost="0" description="standard">
+        </item>
+        <item index="4" value="meager" cost="0" description="meager">
+        </item>
+        <item index="5" value="none" cost="0" description="none">
+        </item>
+    </issue>
+    <issue etype="discrete" index="3" name="Airconditioning" type="discrete" vtype="discrete">
+        <item index="1" value="good" cost="0" description="good">
+        </item>
+        <item index="2" value="fairly good" cost="0" description="fairly good">
+        </item>
+        <item index="3" value="standard" cost="0" description="standard">
+        </item>
+        <item index="4" value="meager" cost="0" description="meager">
+        </item>
+        <item index="5" value="none" cost="0" description="none">
+        </item>
+    </issue>
+    <issue etype="discrete" index="4" name="Tow hedge" type="discrete" vtype="discrete">
+        <item index="1" value="good" cost="0" description="good">
+        </item>
+        <item index="2" value="fairly good" cost="0" description="fairly good">
+        </item>
+        <item index="3" value="standard" cost="0" description="standard">
+        </item>
+        <item index="4" value="meager" cost="0" description="meager">
+        </item>
+        <item index="5" value="none" cost="0" description="none">
+        </item>
+    </issue>
+    <issue etype="discrete" index="5" name="Tow hedge2" type="discrete" vtype="discrete">
+        <item index="1" value="good" cost="0" description="good">
+        </item>
+        <item index="2" value="fairly good" cost="0" description="fairly good">
+        </item>
+        <item index="3" value="standard" cost="0" description="standard">
+        </item>
+        <item index="4" value="meager" cost="0" description="meager">
+        </item>
+        <item index="5" value="none" cost="0" description="none">
+        </item>
+    </issue>
+    <issue etype="discrete" index="6" name="Tow hedge3" type="discrete" vtype="discrete">
+        <item index="1" value="good" cost="0" description="good">
+        </item>
+        <item index="2" value="fairly good" cost="0" description="fairly good">
+        </item>
+        <item index="3" value="standard" cost="0" description="standard">
+        </item>
+        <item index="4" value="meager" cost="0" description="meager">
+        </item>
+        <item index="5" value="none" cost="0" description="none">
+        </item>
+    </issue>
+</objective>
+</utility_space>
+</negotiation_template>

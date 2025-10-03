@@ -1,0 +1,37 @@
+<utility_space type="any" number_of_issues="2">
+<objective index="1" etype="objective" type="objective" description="" name="any">
+<issue index="1" etype="discrete" type="discrete" vtype="integer" name="price">
+    <item index="1" value="1" evaluation="0.0" />
+    <item index="2" value="2" evaluation="0.2" />
+    <item index="3" value="3" evaluation="0.4000000000000001" />
+    <item index="4" value="4" evaluation="0.6000000000000001" />
+    <item index="5" value="5" evaluation="0.8" />
+    <item index="6" value="6" evaluation="1.0000000000000002" />
+</issue>
+<issue index="2" etype="discrete" type="discrete" vtype="integer" name="quantity">
+    <item index="1" value="1" evaluation="0.0" />
+    <item index="2" value="2" evaluation="0.058823529411764705" />
+    <item index="3" value="3" evaluation="0.1176470588235294" />
+    <item index="4" value="4" evaluation="0.1764705882352941" />
+    <item index="5" value="5" evaluation="0.23529411764705882" />
+    <item index="6" value="6" evaluation="0.2941176470588235" />
+    <item index="7" value="7" evaluation="0.3529411764705882" />
+    <item index="8" value="8" evaluation="0.4117647058823529" />
+    <item index="9" value="9" evaluation="0.47058823529411764" />
+    <item index="10" value="10" evaluation="0.5294117647058824" />
+    <item index="11" value="11" evaluation="0.5882352941176471" />
+    <item index="12" value="12" evaluation="0.6470588235294117" />
+    <item index="13" value="13" evaluation="0.7058823529411764" />
+    <item index="14" value="14" evaluation="0.7647058823529411" />
+    <item index="15" value="15" evaluation="0.8235294117647058" />
+    <item index="16" value="16" evaluation="0.8823529411764706" />
+    <item index="17" value="17" evaluation="0.9411764705882353" />
+    <item index="18" value="18" evaluation="1.0" />
+</issue>
+<weight index="1" value="0.5150544930410138">
+</weight>
+<weight index="2" value="0.4849455069589862">
+</weight>
+</objective>
+<reservation value="0.18595753581381425" />
+</utility_space>

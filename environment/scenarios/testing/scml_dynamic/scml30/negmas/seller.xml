@@ -1,0 +1,46 @@
+<utility_space type="any" number_of_issues="3">
+<objective index="1" etype="objective" type="objective" description="" name="any">
+<issue index="1" etype="discrete" type="discrete" vtype="integer" name="price">
+    <item index="1" value="1" evaluation="0.0" />
+    <item index="2" value="2" evaluation="0.16666666666666666" />
+    <item index="3" value="3" evaluation="0.33333333333333337" />
+    <item index="4" value="4" evaluation="0.5" />
+    <item index="5" value="5" evaluation="0.6666666666666666" />
+    <item index="6" value="6" evaluation="0.8333333333333334" />
+    <item index="7" value="7" evaluation="0.9999999999999999" />
+</issue>
+<issue index="2" etype="discrete" type="discrete" vtype="integer" name="quantity">
+    <item index="1" value="1" evaluation="0.0" />
+    <item index="2" value="2" evaluation="0.05555555555555555" />
+    <item index="3" value="3" evaluation="0.1111111111111111" />
+    <item index="4" value="4" evaluation="0.16666666666666666" />
+    <item index="5" value="5" evaluation="0.22222222222222224" />
+    <item index="6" value="6" evaluation="0.2777777777777778" />
+    <item index="7" value="7" evaluation="0.33333333333333326" />
+    <item index="8" value="8" evaluation="0.38888888888888884" />
+    <item index="9" value="9" evaluation="0.4444444444444444" />
+    <item index="10" value="10" evaluation="0.5" />
+    <item index="11" value="11" evaluation="0.5555555555555555" />
+    <item index="12" value="12" evaluation="0.611111111111111" />
+    <item index="13" value="13" evaluation="0.6666666666666666" />
+    <item index="14" value="14" evaluation="0.7222222222222221" />
+    <item index="15" value="15" evaluation="0.7777777777777777" />
+    <item index="16" value="16" evaluation="0.8333333333333333" />
+    <item index="17" value="17" evaluation="0.8888888888888888" />
+    <item index="18" value="18" evaluation="0.9444444444444444" />
+    <item index="19" value="19" evaluation="1.0" />
+</issue>
+<issue index="3" etype="discrete" type="discrete" vtype="discrete" name="carbon emission">
+    <item index="1" value="high" evaluation="0.9359103941657649" />
+    <item index="2" value="med" evaluation="0.34377358661045176" />
+    <item index="3" value="low" evaluation="1.0" />
+</issue>
+<weight index="1" value="0.15452859803909355">
+</weight>
+<weight index="2" value="0.08639996407231404">
+</weight>
+<weight index="3" value="0.7590714378885924">
+</weight>
+</objective>
+<reservation value="0.15568584652740913" />
+</utility_space>

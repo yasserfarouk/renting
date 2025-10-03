@@ -1,0 +1,36 @@
+<utility_space type="any" number_of_issues="3">
+<objective index="1" etype="objective" type="objective" description="" name="any">
+<issue index="1" etype="discrete" type="discrete" vtype="integer" name="price">
+    <item index="1" value="1" evaluation="1.0" />
+    <item index="2" value="2" evaluation="0.75" />
+    <item index="3" value="3" evaluation="0.5" />
+    <item index="4" value="4" evaluation="0.25" />
+    <item index="5" value="5" evaluation="0.0" />
+</issue>
+<issue index="2" etype="discrete" type="discrete" vtype="integer" name="quantity">
+    <item index="1" value="1" evaluation="0.0" />
+    <item index="2" value="2" evaluation="1.0" />
+    <item index="3" value="3" evaluation="1.0" />
+    <item index="4" value="4" evaluation="0.9000000000000001" />
+    <item index="5" value="5" evaluation="0.8" />
+    <item index="6" value="6" evaluation="0.7000000000000001" />
+    <item index="7" value="7" evaluation="0.6000000000000001" />
+    <item index="8" value="8" evaluation="0.5" />
+    <item index="9" value="9" evaluation="0.4" />
+    <item index="10" value="10" evaluation="0.30000000000000004" />
+    <item index="11" value="11" evaluation="0.20000000000000007" />
+</issue>
+<issue index="3" etype="discrete" type="discrete" vtype="discrete" name="carbon emission">
+    <item index="1" value="high" evaluation="0.7703993260949054" />
+    <item index="2" value="med" evaluation="1.0" />
+    <item index="3" value="low" evaluation="0.15404975316559041" />
+</issue>
+<weight index="1" value="0.3834312574374913">
+</weight>
+<weight index="2" value="0.17897003962397243">
+</weight>
+<weight index="3" value="0.4375987029385364">
+</weight>
+</objective>
+<reservation value="0.08474923713766346" />
+</utility_space>

@@ -1,0 +1,74 @@
+<negotiation_template>
+<utility_space number_of_issues="3">
+<objective description="" etype="objective" index="0" name="root" type="objective">
+    <issue etype="discrete" index="1" name="i1" type="discrete" vtype="discrete">
+        <item index="1" value="v1" cost="0" description="v1">
+        </item>
+        <item index="2" value="v2" cost="0" description="v2">
+        </item>
+        <item index="3" value="v3" cost="0" description="v3">
+        </item>
+        <item index="4" value="v4" cost="0" description="v4">
+        </item>
+        <item index="5" value="v5" cost="0" description="v5">
+        </item>
+        <item index="6" value="v6" cost="0" description="v6">
+        </item>
+        <item index="7" value="v7" cost="0" description="v7">
+        </item>
+        <item index="8" value="v8" cost="0" description="v8">
+        </item>
+        <item index="9" value="v9" cost="0" description="v9">
+        </item>
+        <item index="10" value="v10" cost="0" description="v10">
+        </item>
+    </issue>
+    <issue etype="discrete" index="2" name="i2" type="discrete" vtype="discrete">
+        <item index="1" value="v1" cost="0" description="v1">
+        </item>
+        <item index="2" value="v2" cost="0" description="v2">
+        </item>
+        <item index="3" value="v3" cost="0" description="v3">
+        </item>
+        <item index="4" value="v4" cost="0" description="v4">
+        </item>
+        <item index="5" value="v5" cost="0" description="v5">
+        </item>
+        <item index="6" value="v6" cost="0" description="v6">
+        </item>
+        <item index="7" value="v7" cost="0" description="v7">
+        </item>
+        <item index="8" value="v8" cost="0" description="v8">
+        </item>
+        <item index="9" value="v9" cost="0" description="v9">
+        </item>
+        <item index="10" value="v10" cost="0" description="v10">
+        </item>
+    </issue>
+    <issue etype="discrete" index="3" name="i3" type="discrete" vtype="discrete">
+        <item index="1" value="v1" cost="0" description="v1">
+        </item>
+        <item index="2" value="v2" cost="0" description="v2">
+        </item>
+        <item index="3" value="v3" cost="0" description="v3">
+        </item>
+        <item index="4" value="v4" cost="0" description="v4">
+        </item>
+        <item index="5" value="v5" cost="0" description="v5">
+        </item>
+        <item index="6" value="v6" cost="0" description="v6">
+        </item>
+        <item index="7" value="v7" cost="0" description="v7">
+        </item>
+        <item index="8" value="v8" cost="0" description="v8">
+        </item>
+        <item index="9" value="v9" cost="0" description="v9">
+        </item>
+        <item index="10" value="v10" cost="0" description="v10">
+        </item>
+        <item index="11" value="v11" cost="0" description="v11">
+        </item>
+    </issue>
+</objective>
+</utility_space>
+</negotiation_template>

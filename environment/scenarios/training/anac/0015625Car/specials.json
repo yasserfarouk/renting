@@ -1,0 +1,800 @@
+{
+  "distribution": null,
+  "kalai": {
+    "outcome": [
+      "standard",
+      "standard",
+      "standard",
+      "meager",
+      "fairly good",
+      "standard"
+    ],
+    "utility": [
+      [
+        0.9335000000000002,
+        0.9316000000000002
+      ]
+    ]
+  },
+  "load_path": null,
+  "name": "0015625Car",
+  "nash": {
+    "outcome": [
+      "standard",
+      "standard",
+      "standard",
+      "meager",
+      "fairly good",
+      "fairly good"
+    ],
+    "utility": [
+      [
+        0.9403000000000001,
+        0.9296000000000002
+      ]
+    ]
+  },
+  "opposition": 0.09230520028687417,
+  "pareto_front": [
+    {
+      "outcome": [
+        "standard",
+        "standard",
+        "standard",
+        "meager",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9403000000000001,
+        0.9296000000000002
+      ]
+    },
+    {
+      "outcome": [
+        "meager",
+        "standard",
+        "standard",
+        "meager",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9131,
+        0.9548000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "standard",
+        "standard",
+        "standard",
+        "standard",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9539000000000001,
+        0.9136000000000002
+      ]
+    },
+    {
+      "outcome": [
+        "meager",
+        "standard",
+        "standard",
+        "standard",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9267000000000001,
+        0.9388000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "standard",
+        "standard",
+        "standard",
+        "meager",
+        "fairly good",
+        "standard"
+      ],
+      "utility": [
+        0.9335000000000002,
+        0.9316000000000002
+      ]
+    },
+    {
+      "outcome": [
+        "standard",
+        "standard",
+        "meager",
+        "meager",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9182000000000001,
+        0.9456
+      ]
+    },
+    {
+      "outcome": [
+        "meager",
+        "standard",
+        "standard",
+        "meager",
+        "fairly good",
+        "standard"
+      ],
+      "utility": [
+        0.9063000000000001,
+        0.9568000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "standard",
+        "standard",
+        "standard",
+        "standard",
+        "standard",
+        "fairly good"
+      ],
+      "utility": [
+        0.9471000000000002,
+        0.9156000000000002
+      ]
+    },
+    {
+      "outcome": [
+        "meager",
+        "standard",
+        "meager",
+        "meager",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.891,
+        0.9707999999999999
+      ]
+    },
+    {
+      "outcome": [
+        "meager",
+        "standard",
+        "standard",
+        "standard",
+        "fairly good",
+        "standard"
+      ],
+      "utility": [
+        0.9199000000000002,
+        0.9408000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "meager",
+        "standard",
+        "standard",
+        "meager",
+        "standard",
+        "standard"
+      ],
+      "utility": [
+        0.8995,
+        0.9588000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "standard",
+        "standard",
+        "standard",
+        "fairly good",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9641000000000001,
+        0.8936000000000002
+      ]
+    },
+    {
+      "outcome": [
+        "meager",
+        "standard",
+        "meager",
+        "meager",
+        "fairly good",
+        "standard"
+      ],
+      "utility": [
+        0.8842000000000001,
+        0.9727999999999999
+      ]
+    },
+    {
+      "outcome": [
+        "standard",
+        "standard",
+        "standard",
+        "standard",
+        "good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9556000000000001,
+        0.8976000000000002
+      ]
+    },
+    {
+      "outcome": [
+        "standard",
+        "standard",
+        "standard",
+        "fairly good",
+        "standard",
+        "fairly good"
+      ],
+      "utility": [
+        0.9573000000000002,
+        0.8956000000000002
+      ]
+    },
+    {
+      "outcome": [
+        "meager",
+        "standard",
+        "meager",
+        "meager",
+        "standard",
+        "standard"
+      ],
+      "utility": [
+        0.8774,
+        0.9747999999999999
+      ]
+    },
+    {
+      "outcome": [
+        "fairly good",
+        "standard",
+        "standard",
+        "fairly good",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9737,
+        0.8720000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "standard",
+        "standard",
+        "standard",
+        "fairly good",
+        "good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9658000000000001,
+        0.8776000000000002
+      ]
+    },
+    {
+      "outcome": [
+        "fairly good",
+        "standard",
+        "standard",
+        "fairly good",
+        "fairly good",
+        "standard"
+      ],
+      "utility": [
+        0.9669000000000001,
+        0.8740000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "fairly good",
+        "standard",
+        "standard",
+        "fairly good",
+        "good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9754,
+        0.8560000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "fairly good",
+        "standard",
+        "fairly good",
+        "fairly good",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9788,
+        0.8500000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "meager",
+        "standard",
+        "meager",
+        "meager",
+        "meager",
+        "standard"
+      ],
+      "utility": [
+        0.8519000000000001,
+        0.9757999999999999
+      ]
+    },
+    {
+      "outcome": [
+        "fairly good",
+        "fairly good",
+        "standard",
+        "fairly good",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9833000000000001,
+        0.8400000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "fairly good",
+        "fairly good",
+        "standard",
+        "fairly good",
+        "good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9850000000000001,
+        0.8240000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "fairly good",
+        "fairly good",
+        "fairly good",
+        "fairly good",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.9884000000000001,
+        0.8180000000000002
+      ]
+    },
+    {
+      "outcome": [
+        "meager",
+        "standard",
+        "meager",
+        "meager",
+        "meager",
+        "meager"
+      ],
+      "utility": [
+        0.8264,
+        0.9767999999999999
+      ]
+    },
+    {
+      "outcome": [
+        "fairly good",
+        "fairly good",
+        "fairly good",
+        "fairly good",
+        "fairly good",
+        "good"
+      ],
+      "utility": [
+        0.9901000000000001,
+        0.8020000000000002
+      ]
+    },
+    {
+      "outcome": [
+        "fairly good",
+        "fairly good",
+        "fairly good",
+        "fairly good",
+        "good",
+        "good"
+      ],
+      "utility": [
+        0.9918000000000001,
+        0.7860000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "standard",
+        "meager",
+        "meager",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.771,
+        0.978
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "standard",
+        "meager",
+        "meager",
+        "standard",
+        "fairly good"
+      ],
+      "utility": [
+        0.7642000000000001,
+        0.98
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "standard",
+        "meager",
+        "meager",
+        "standard",
+        "standard"
+      ],
+      "utility": [
+        0.7574000000000001,
+        0.982
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "standard",
+        "meager",
+        "meager",
+        "standard",
+        "meager"
+      ],
+      "utility": [
+        0.7319000000000001,
+        0.983
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "standard",
+        "meager",
+        "meager",
+        "meager",
+        "meager"
+      ],
+      "utility": [
+        0.7064,
+        0.984
+      ]
+    },
+    {
+      "outcome": [
+        "meager",
+        "none",
+        "meager",
+        "meager",
+        "meager",
+        "meager"
+      ],
+      "utility": [
+        0.6776000000000001,
+        0.9847999999999999
+      ]
+    },
+    {
+      "outcome": [
+        "fairly good",
+        "fairly good",
+        "fairly good",
+        "good",
+        "good",
+        "good"
+      ],
+      "utility": [
+        0.9935000000000002,
+        0.6260000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "none",
+        "meager",
+        "meager",
+        "fairly good",
+        "fairly good"
+      ],
+      "utility": [
+        0.6222000000000001,
+        0.986
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "none",
+        "meager",
+        "meager",
+        "fairly good",
+        "standard"
+      ],
+      "utility": [
+        0.6154000000000002,
+        0.988
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "none",
+        "meager",
+        "meager",
+        "standard",
+        "standard"
+      ],
+      "utility": [
+        0.6086000000000001,
+        0.99
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "none",
+        "meager",
+        "meager",
+        "meager",
+        "standard"
+      ],
+      "utility": [
+        0.5831000000000002,
+        0.991
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "none",
+        "meager",
+        "meager",
+        "meager",
+        "meager"
+      ],
+      "utility": [
+        0.5576000000000001,
+        0.992
+      ]
+    },
+    {
+      "outcome": [
+        "good",
+        "fairly good",
+        "fairly good",
+        "fairly good",
+        "good",
+        "good"
+      ],
+      "utility": [
+        0.9950000000000001,
+        0.4800000000000001
+      ]
+    },
+    {
+      "outcome": [
+        "fairly good",
+        "fairly good",
+        "good",
+        "good",
+        "good",
+        "good"
+      ],
+      "utility": [
+        0.9952000000000002,
+        0.466
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "none",
+        "meager",
+        "none",
+        "standard",
+        "standard"
+      ],
+      "utility": [
+        0.4641000000000001,
+        0.994
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "none",
+        "meager",
+        "none",
+        "standard",
+        "meager"
+      ],
+      "utility": [
+        0.4386000000000001,
+        0.995
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "none",
+        "meager",
+        "none",
+        "meager",
+        "meager"
+      ],
+      "utility": [
+        0.4131,
+        0.996
+      ]
+    },
+    {
+      "outcome": [
+        "good",
+        "fairly good",
+        "fairly good",
+        "good",
+        "good",
+        "good"
+      ],
+      "utility": [
+        0.9967000000000001,
+        0.32000000000000006
+      ]
+    },
+    {
+      "outcome": [
+        "fairly good",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good"
+      ],
+      "utility": [
+        0.9968000000000001,
+        0.306
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "none",
+        "none",
+        "none",
+        "standard",
+        "meager"
+      ],
+      "utility": [
+        0.29750000000000004,
+        0.997
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "none",
+        "none",
+        "none",
+        "meager",
+        "meager"
+      ],
+      "utility": [
+        0.272,
+        0.998
+      ]
+    },
+    {
+      "outcome": [
+        "good",
+        "fairly good",
+        "good",
+        "good",
+        "good",
+        "good"
+      ],
+      "utility": [
+        0.9984000000000002,
+        0.16000000000000003
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "none",
+        "none",
+        "none",
+        "none",
+        "meager"
+      ],
+      "utility": [
+        0.136,
+        0.999
+      ]
+    },
+    {
+      "outcome": [
+        "none",
+        "none",
+        "none",
+        "none",
+        "none",
+        "none"
+      ],
+      "utility": [
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "outcome": [
+        "good",
+        "good",
+        "good",
+        "good",
+        "good",
+        "good"
+      ],
+      "utility": [
+        1.0,
+        0.0
+      ]
+    }
+  ],
+  "size": 15625,
+  "social_welfare": {
+    "outcome": [
+      "standard",
+      "standard",
+      "standard",
+      "meager",
+      "fairly good",
+      "fairly good"
+    ],
+    "utility": [
+      [
+        0.9403000000000001,
+        0.9296000000000002
+      ]
+    ]
+  },
+  "src_path": "environment/scenarios/training_src/anac/0015625Car"
+}

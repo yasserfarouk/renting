@@ -1,0 +1,47 @@
+<utility_space type="any" number_of_issues="3">
+<objective index="1" etype="objective" type="objective" description="" name="any">
+<issue index="1" etype="discrete" type="discrete" vtype="discrete" name="i1">
+    <item index="1" value="v1" evaluation="0.6405244485359001" />
+    <item index="2" value="v2" evaluation="1.0" />
+    <item index="3" value="v3" evaluation="0.6405244485359001" />
+    <item index="4" value="v4" evaluation="0.5236370346864407" />
+    <item index="5" value="v5" evaluation="0.2033748104184907" />
+    <item index="6" value="v6" evaluation="0.0" />
+    <item index="7" value="v7" evaluation="0.8801748161786334" />
+    <item index="8" value="v8" evaluation="0.0" />
+    <item index="9" value="v9" evaluation="0.4067496208369814" />
+    <item index="10" value="v10" evaluation="0.7633222697634489" />
+    <item index="11" value="v11" evaluation="0.4067496208369814" />
+</issue>
+<issue index="2" etype="discrete" type="discrete" vtype="discrete" name="i2">
+    <item index="1" value="v1" evaluation="0.6202385154248317" />
+    <item index="2" value="v2" evaluation="1.0" />
+    <item index="3" value="v3" evaluation="0.5975913034383905" />
+    <item index="4" value="v4" evaluation="0.0" />
+    <item index="5" value="v5" evaluation="0.38052743007301376" />
+    <item index="6" value="v6" evaluation="0.5845920110915386" />
+    <item index="7" value="v7" evaluation="0.38052743007301376" />
+    <item index="8" value="v8" evaluation="0.5845920110915386" />
+    <item index="9" value="v9" evaluation="1.0" />
+    <item index="10" value="v10" evaluation="0.0" />
+</issue>
+<issue index="3" etype="discrete" type="discrete" vtype="discrete" name="i3">
+    <item index="1" value="v1" evaluation="0.42316874917964603" />
+    <item index="2" value="v2" evaluation="0.0" />
+    <item index="3" value="v3" evaluation="0.7691864753203604" />
+    <item index="4" value="v4" evaluation="0.634753123769469" />
+    <item index="5" value="v5" evaluation="0.0" />
+    <item index="6" value="v6" evaluation="0.8782510412564897" />
+    <item index="7" value="v7" evaluation="0.1493104945751543" />
+    <item index="8" value="v8" evaluation="0.634753123769469" />
+    <item index="9" value="v9" evaluation="1.0" />
+</issue>
+<weight index="1" value="0.0015282300134762112">
+</weight>
+<weight index="2" value="0.6378979416368011">
+</weight>
+<weight index="3" value="0.3605738283497227">
+</weight>
+</objective>
+<reservation value="0.1050919943990496" />
+</utility_space>

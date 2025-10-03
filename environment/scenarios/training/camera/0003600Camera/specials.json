@@ -1,0 +1,226 @@
+{
+  "distribution": null,
+  "kalai": {
+    "outcome": [
+      "Canon",
+      "APS-C",
+      "High end model",
+      "Manfrotto",
+      "Lowepro",
+      "Battery Grip"
+    ],
+    "utility": [
+      [
+        0.7816865847500422,
+        0.7950512371907024
+      ]
+    ]
+  },
+  "load_path": null,
+  "name": "0003600Camera",
+  "nash": {
+    "outcome": [
+      "Nikon",
+      "APS-C",
+      "High end model",
+      "Manfrotto",
+      "Domke",
+      "Battery Grip"
+    ],
+    "utility": [
+      [
+        0.864332603938731,
+        0.7530617345663584
+      ]
+    ]
+  },
+  "opposition": 0.281751928634785,
+  "pareto_front": [
+    {
+      "outcome": [
+        "Nikon",
+        "APS-C",
+        "High end model",
+        "Manfrotto",
+        "Domke",
+        "Battery Grip"
+      ],
+      "utility": [
+        0.864332603938731,
+        0.7530617345663584
+      ]
+    },
+    {
+      "outcome": [
+        "Canon",
+        "APS-C",
+        "High end model",
+        "Manfrotto",
+        "Domke",
+        "Battery Grip"
+      ],
+      "utility": [
+        0.8872243730011784,
+        0.7270682329417646
+      ]
+    },
+    {
+      "outcome": [
+        "Nikon",
+        "APS-C",
+        "High end model",
+        "Manfrotto",
+        "Lowepro",
+        "Battery Grip"
+      ],
+      "utility": [
+        0.7587948156875948,
+        0.8210447388152962
+      ]
+    },
+    {
+      "outcome": [
+        "Canon",
+        "APS-C",
+        "High end model",
+        "Manfrotto",
+        "Lowepro",
+        "Battery Grip"
+      ],
+      "utility": [
+        0.7816865847500422,
+        0.7950512371907024
+      ]
+    },
+    {
+      "outcome": [
+        "Nikon",
+        "APS-C",
+        "High end model",
+        "GITZO",
+        "Domke",
+        "Battery Grip"
+      ],
+      "utility": [
+        0.9569096111765697,
+        0.6100974756310922
+      ]
+    },
+    {
+      "outcome": [
+        "Canon",
+        "APS-C",
+        "High end model",
+        "GITZO",
+        "Domke",
+        "Battery Grip"
+      ],
+      "utility": [
+        0.9798013802390171,
+        0.5841039740064984
+      ]
+    },
+    {
+      "outcome": [
+        "Pentax",
+        "APS-C",
+        "High end model",
+        "Manfrotto",
+        "Domke",
+        "Battery Grip"
+      ],
+      "utility": [
+        0.5324019525332435,
+        0.9250187453136718
+      ]
+    },
+    {
+      "outcome": [
+        "Canon",
+        "Full size",
+        "High end model",
+        "GITZO",
+        "Domke",
+        "Battery Grip"
+      ],
+      "utility": [
+        1.0,
+        0.45588602849287685
+      ]
+    },
+    {
+      "outcome": [
+        "Nikon",
+        "APS-C",
+        "High end model",
+        "Manfrotto",
+        "Lowepro",
+        "Electronic Flash"
+      ],
+      "utility": [
+        0.6012455815519273,
+        0.8280429892526868
+      ]
+    },
+    {
+      "outcome": [
+        "Pentax",
+        "APS-C",
+        "High end model",
+        "Manfrotto",
+        "Lowepro",
+        "Battery Grip"
+      ],
+      "utility": [
+        0.4268641642821074,
+        0.9930017495626096
+      ]
+    },
+    {
+      "outcome": [
+        "Sony",
+        "APS-C",
+        "High end model",
+        "Manfrotto",
+        "Domke",
+        "Battery Grip"
+      ],
+      "utility": [
+        0.5495707793300791,
+        0.8450387403149213
+      ]
+    },
+    {
+      "outcome": [
+        "Pentax",
+        "APS-C",
+        "High end model",
+        "Manfrotto",
+        "Lowepro",
+        "Electronic Flash"
+      ],
+      "utility": [
+        0.26931493014644,
+        1.0000000000000002
+      ]
+    }
+  ],
+  "size": 3600,
+  "social_welfare": {
+    "outcome": [
+      "Nikon",
+      "APS-C",
+      "High end model",
+      "Manfrotto",
+      "Domke",
+      "Battery Grip"
+    ],
+    "utility": [
+      [
+        0.864332603938731,
+        0.7530617345663584
+      ]
+    ]
+  },
+  "src_path": "environment/scenarios/training_src/camera/0003600Camera"
+}

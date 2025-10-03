@@ -1,0 +1,256 @@
+{
+  "distribution": null,
+  "kalai": {
+    "outcome": [
+      "$3.47",
+      "45 days",
+      "30 days after delivery",
+      "5% spoilage allowed"
+    ],
+    "utility": [
+      [
+        0.771555357672274,
+        0.6770643082030199
+      ]
+    ]
+  },
+  "load_path": null,
+  "name": "0000180ItexvsCypress",
+  "nash": {
+    "outcome": [
+      "$3.47",
+      "45 days",
+      "30 days after delivery",
+      "5% spoilage allowed"
+    ],
+    "utility": [
+      [
+        0.771555357672274,
+        0.6770643082030199
+      ]
+    ]
+  },
+  "opposition": 0.3955684714997351,
+  "pareto_front": [
+    {
+      "outcome": [
+        "$3.47",
+        "45 days",
+        "30 days after delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.771555357672274,
+        0.6770643082030199
+      ]
+    },
+    {
+      "outcome": [
+        "$3.47",
+        "30 days",
+        "30 days after delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.8106223383014776,
+        0.6030407900933192
+      ]
+    },
+    {
+      "outcome": [
+        "$3.47",
+        "20 days",
+        "30 days after delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.8366669920542799,
+        0.566029031038469
+      ]
+    },
+    {
+      "outcome": [
+        "$3.71",
+        "45 days",
+        "30 days after delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.6545709013037051,
+        0.7216071622439826
+      ]
+    },
+    {
+      "outcome": [
+        "$3.47",
+        "30 days",
+        "Upon delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.867349992652292,
+        0.4626730444526095
+      ]
+    },
+    {
+      "outcome": [
+        "$3.47",
+        "20 days",
+        "Upon delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.8933946464050943,
+        0.42566128539775927
+      ]
+    },
+    {
+      "outcome": [
+        "$3.98",
+        "45 days",
+        "30 days after delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.5208743797396265,
+        0.7772857297951861
+      ]
+    },
+    {
+      "outcome": [
+        "$3.47",
+        "30 days",
+        "30 days after delivery",
+        "Full price"
+      ],
+      "utility": [
+        0.9172276918963832,
+        0.29120955932386616
+      ]
+    },
+    {
+      "outcome": [
+        "$3.47",
+        "20 days",
+        "30 days after delivery",
+        "Full price"
+      ],
+      "utility": [
+        0.9432723456491855,
+        0.25419780026901595
+      ]
+    },
+    {
+      "outcome": [
+        "$4.12",
+        "45 days",
+        "30 days after delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.27019340180697876,
+        0.888642864897593
+      ]
+    },
+    {
+      "outcome": [
+        "$3.47",
+        "30 days",
+        "Upon delivery",
+        "Full price"
+      ],
+      "utility": [
+        0.9739553462471976,
+        0.15084181368315636
+      ]
+    },
+    {
+      "outcome": [
+        "$4.12",
+        "30 days",
+        "30 days after delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.30926038243618226,
+        0.8146193467878926
+      ]
+    },
+    {
+      "outcome": [
+        "$4.37",
+        "45 days",
+        "30 days after delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.11978481504739018,
+        1.0
+      ]
+    },
+    {
+      "outcome": [
+        "$3.47",
+        "20 days",
+        "Upon delivery",
+        "Full price"
+      ],
+      "utility": [
+        0.9999999999999999,
+        0.11383005462830612
+      ]
+    },
+    {
+      "outcome": [
+        "$4.12",
+        "20 days",
+        "30 days after delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.33530503618898455,
+        0.7776075877330424
+      ]
+    },
+    {
+      "outcome": [
+        "$4.37",
+        "30 days",
+        "30 days after delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.1588517956765937,
+        0.9259764818902996
+      ]
+    },
+    {
+      "outcome": [
+        "$4.37",
+        "20 days",
+        "30 days after delivery",
+        "5% spoilage allowed"
+      ],
+      "utility": [
+        0.18489644942939598,
+        0.8889647228354494
+      ]
+    }
+  ],
+  "size": 180,
+  "social_welfare": {
+    "outcome": [
+      "$3.47",
+      "45 days",
+      "30 days after delivery",
+      "5% spoilage allowed"
+    ],
+    "utility": [
+      [
+        0.771555357672274,
+        0.6770643082030199
+      ]
+    ]
+  },
+  "src_path": "environment/scenarios/testing_src/itex/0000180ItexvsCypress"
+}

@@ -1,0 +1,53 @@
+<utility_space type="any" number_of_issues="6">
+<objective index="1" etype="objective" type="objective" description="" name="any">
+<issue index="1" etype="discrete" type="discrete" vtype="discrete" name="Maker">
+    <item index="1" value="Canon" evaluation="-0.03424143964009008" />
+    <item index="2" value="Nikon" evaluation="0.29067733066733314" />
+    <item index="3" value="Pentax" evaluation="2.4401399650087483" />
+    <item index="4" value="Sony" evaluation="1.4403899025243692" />
+    <item index="5" value="Panasonic" evaluation="0.04073981504623836" />
+</issue>
+<issue index="2" etype="discrete" type="discrete" vtype="discrete" name="Body">
+    <item index="1" value="Full size" evaluation="0.09072731817045732" />
+    <item index="2" value="APS-C" evaluation="1.5153711572106976" />
+    <item index="3" value="Micro Four Thirds" evaluation="0.5406148462884279" />
+    <item index="4" value="compact" evaluation="-0.009247688077980598" />
+</issue>
+<issue index="3" etype="discrete" type="discrete" vtype="discrete" name="Lens">
+    <item index="1" value="High end model" evaluation="1.1904523869032744" />
+    <item index="2" value="Middle range model" evaluation="0.5656085978505374" />
+    <item index="3" value="Entry model" evaluation="-0.009247688077980598" />
+</issue>
+<issue index="4" etype="discrete" type="discrete" vtype="discrete" name="Tripod">
+    <item index="1" value="GITZO" evaluation="0.1907023244188952" />
+    <item index="2" value="Manfrotto" evaluation="0.7405648587853038" />
+    <item index="3" value="Induro" evaluation="0.04073981504623836" />
+</issue>
+<issue index="5" etype="discrete" type="discrete" vtype="discrete" name="Bag">
+    <item index="1" value="Domke" evaluation="0.04073981504623836" />
+    <item index="2" value="Lowepro" evaluation="0.44063984003998996" />
+    <item index="3" value="Tamrac" evaluation="-0.009247688077980598" />
+    <item index="4" value="National Geographic" evaluation="0.09072731817045732" />
+    <item index="5" value="Artizan and Artist" evaluation="0.14071482129467627" />
+</issue>
+<issue index="6" etype="discrete" type="discrete" vtype="discrete" name="Accessory">
+    <item index="1" value="Electronic Flash" evaluation="0.1157210697325668" />
+    <item index="2" value="Battery Grip" evaluation="0.01574606348412888" />
+    <item index="3" value="Memory" evaluation="0.04073981504623836" />
+    <item index="4" value="Strap" evaluation="-0.03424143964009008" />
+</issue>
+<weight index="1" value="0.08">
+</weight>
+<weight index="2" value="0.09">
+</weight>
+<weight index="3" value="0.33">
+</weight>
+<weight index="4" value="0.26">
+</weight>
+<weight index="5" value="0.17">
+</weight>
+<weight index="6" value="0.07">
+</weight>
+</objective>
+<discount_factor value="0.890596104" />
+</utility_space>

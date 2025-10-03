@@ -1,0 +1,62 @@
+<negotiation_template>
+<utility_space number_of_issues="3">
+<objective description="" etype="objective" index="0" name="root" type="objective">
+    <issue etype="discrete" index="1" name="price" type="discrete" vtype="integer">
+        <item index="1" value="1" cost="0" description="1">
+        </item>
+        <item index="2" value="2" cost="0" description="2">
+        </item>
+        <item index="3" value="3" cost="0" description="3">
+        </item>
+        <item index="4" value="4" cost="0" description="4">
+        </item>
+        <item index="5" value="5" cost="0" description="5">
+        </item>
+        <item index="6" value="6" cost="0" description="6">
+        </item>
+        <item index="7" value="7" cost="0" description="7">
+        </item>
+    </issue>
+    <issue etype="discrete" index="2" name="quantity" type="discrete" vtype="integer">
+        <item index="1" value="1" cost="0" description="1">
+        </item>
+        <item index="2" value="2" cost="0" description="2">
+        </item>
+        <item index="3" value="3" cost="0" description="3">
+        </item>
+        <item index="4" value="4" cost="0" description="4">
+        </item>
+        <item index="5" value="5" cost="0" description="5">
+        </item>
+        <item index="6" value="6" cost="0" description="6">
+        </item>
+        <item index="7" value="7" cost="0" description="7">
+        </item>
+        <item index="8" value="8" cost="0" description="8">
+        </item>
+        <item index="9" value="9" cost="0" description="9">
+        </item>
+        <item index="10" value="10" cost="0" description="10">
+        </item>
+        <item index="11" value="11" cost="0" description="11">
+        </item>
+        <item index="12" value="12" cost="0" description="12">
+        </item>
+        <item index="13" value="13" cost="0" description="13">
+        </item>
+        <item index="14" value="14" cost="0" description="14">
+        </item>
+        <item index="15" value="15" cost="0" description="15">
+        </item>
+    </issue>
+    <issue etype="discrete" index="3" name="carbon emission" type="discrete" vtype="discrete">
+        <item index="1" value="high" cost="0" description="high">
+        </item>
+        <item index="2" value="med" cost="0" description="med">
+        </item>
+        <item index="3" value="low" cost="0" description="low">
+        </item>
+    </issue>
+</objective>
+</utility_space>
+</negotiation_template>

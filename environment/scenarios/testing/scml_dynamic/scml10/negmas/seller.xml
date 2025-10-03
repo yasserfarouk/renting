@@ -1,0 +1,40 @@
+<utility_space type="any" number_of_issues="3">
+<objective index="1" etype="objective" type="objective" description="" name="any">
+<issue index="1" etype="discrete" type="discrete" vtype="integer" name="price">
+    <item index="1" value="1" evaluation="0.0" />
+    <item index="2" value="2" evaluation="0.16666666666666666" />
+    <item index="3" value="3" evaluation="0.33333333333333337" />
+    <item index="4" value="4" evaluation="0.5" />
+    <item index="5" value="5" evaluation="0.6666666666666666" />
+    <item index="6" value="6" evaluation="0.8333333333333334" />
+    <item index="7" value="7" evaluation="0.9999999999999999" />
+</issue>
+<issue index="2" etype="discrete" type="discrete" vtype="integer" name="quantity">
+    <item index="1" value="1" evaluation="0.0" />
+    <item index="2" value="2" evaluation="0.08333333333333333" />
+    <item index="3" value="3" evaluation="0.16666666666666669" />
+    <item index="4" value="4" evaluation="0.25" />
+    <item index="5" value="5" evaluation="0.3333333333333333" />
+    <item index="6" value="6" evaluation="0.4166666666666667" />
+    <item index="7" value="7" evaluation="0.49999999999999994" />
+    <item index="8" value="8" evaluation="0.5833333333333333" />
+    <item index="9" value="9" evaluation="0.6666666666666666" />
+    <item index="10" value="10" evaluation="0.7499999999999999" />
+    <item index="11" value="11" evaluation="0.8333333333333333" />
+    <item index="12" value="12" evaluation="0.9166666666666666" />
+    <item index="13" value="13" evaluation="0.9999999999999999" />
+</issue>
+<issue index="3" etype="discrete" type="discrete" vtype="discrete" name="carbon emission">
+    <item index="1" value="high" evaluation="0.42160953200140017" />
+    <item index="2" value="med" evaluation="1.0" />
+    <item index="3" value="low" evaluation="0.07893253092993738" />
+</issue>
+<weight index="1" value="0.5024132100041869">
+</weight>
+<weight index="2" value="0.29068665803218924">
+</weight>
+<weight index="3" value="0.20690013196362383">
+</weight>
+</objective>
+<reservation value="0.12093933245774838" />
+</utility_space>

@@ -1,0 +1,45 @@
+<utility_space type="any" number_of_issues="3">
+<objective index="1" etype="objective" type="objective" description="" name="any">
+<issue index="1" etype="discrete" type="discrete" vtype="integer" name="price">
+    <item index="1" value="1" evaluation="1.0" />
+    <item index="2" value="2" evaluation="0.7999999999999999" />
+    <item index="3" value="3" evaluation="0.5999999999999999" />
+    <item index="4" value="4" evaluation="0.3999999999999999" />
+    <item index="5" value="5" evaluation="0.19999999999999996" />
+    <item index="6" value="6" evaluation="-2.220446049250313e-16" />
+</issue>
+<issue index="2" etype="discrete" type="discrete" vtype="integer" name="quantity">
+    <item index="1" value="1" evaluation="0.0" />
+    <item index="2" value="2" evaluation="0.14285714285714285" />
+    <item index="3" value="3" evaluation="0.2857142857142857" />
+    <item index="4" value="4" evaluation="0.42857142857142855" />
+    <item index="5" value="5" evaluation="0.5714285714285714" />
+    <item index="6" value="6" evaluation="0.7142857142857142" />
+    <item index="7" value="7" evaluation="0.8571428571428572" />
+    <item index="8" value="8" evaluation="1.0" />
+    <item index="9" value="9" evaluation="0.9999999999999999" />
+    <item index="10" value="10" evaluation="0.9166666666666666" />
+    <item index="11" value="11" evaluation="0.8333333333333333" />
+    <item index="12" value="12" evaluation="0.75" />
+    <item index="13" value="13" evaluation="0.6666666666666666" />
+    <item index="14" value="14" evaluation="0.5833333333333333" />
+    <item index="15" value="15" evaluation="0.5" />
+    <item index="16" value="16" evaluation="0.41666666666666663" />
+    <item index="17" value="17" evaluation="0.33333333333333326" />
+    <item index="18" value="18" evaluation="0.25" />
+    <item index="19" value="19" evaluation="0.16666666666666663" />
+</issue>
+<issue index="3" etype="discrete" type="discrete" vtype="discrete" name="carbon emission">
+    <item index="1" value="high" evaluation="0.27376747309581373" />
+    <item index="2" value="med" evaluation="1.0" />
+    <item index="3" value="low" evaluation="0.8319064952369396" />
+</issue>
+<weight index="1" value="0.1919848351854527">
+</weight>
+<weight index="2" value="0.7638636996046384">
+</weight>
+<weight index="3" value="0.044151465209908904">
+</weight>
+</objective>
+<reservation value="0.05699500296011004" />
+</utility_space>
