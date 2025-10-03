@@ -34,6 +34,7 @@ class NegotiationEnvZoo(ParallelEnv):
         env_config,
         render_mode=None,
     ):
+        self._testing = env_config.get("testing", False)
         self.issue_size = env_config.get("issue_size", 0)
         self.n_issues = env_config.get("n_issues", 0)
         self.possible_agents = [a for a in env_config["agents"] if a.startswith("RL")]
@@ -259,9 +260,20 @@ class NegotiationEnvZoo(ParallelEnv):
         }
 
         metrics = dict()
-        if self.scenario.src_path and Path(self.scenario.src_path).is_dir():
-            neg = NegmasScenario.load(Path(self.scenario.src_path))
-            if neg:
+        if self._testing:
+            neg = self.scenario.negmas_scenario
+            if neg is None:
+                negpath = None
+                if (
+                    self.scenario.load_path
+                    and (Path(self.scenario.load_path) / "negmas").is_dir()
+                ):
+                    negpath = Path(self.scenario.load_path) / "negmas"
+                elif self.scenario.src_path and Path(self.scenario.src_path).is_dir():
+                    negpath = Path(self.scenario.src_path)
+                if negpath:
+                    neg = NegmasScenario.load(negpath)
+            if neg is not None:
                 stats_ = neg.calc_stats()
                 dists = calc_outcome_distances(
                     tuple([float(_) for _ in utility_all_agents.values()]), stats_
@@ -269,8 +281,6 @@ class NegotiationEnvZoo(ParallelEnv):
                 metrics = asdict(
                     calc_outcome_optimality(dists, stats_, estimate_max_dist(neg.ufuns))
                 )
-                print(metrics)
-                breakpoint()
 
         infos = {
             agent.agent_id: {

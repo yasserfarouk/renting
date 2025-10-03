@@ -8,6 +8,7 @@ from pathlib import Path
 from shutil import rmtree
 from typing import Iterable
 from uuid import uuid4
+from negmas.inout import Scenario as NegmasScenario
 
 import numpy as np
 import plotly.graph_objects as go
@@ -116,13 +117,15 @@ class Scenario:
         distribution=None,
         opposition=None,
         visualisation=None,
-        name: str = None,
-        src_path: str | Path = None,
-        load_path: str | Path = None,
+        name: str | None = None,
+        src_path: str | Path | None = None,
+        load_path: str | Path | None = None,
+        negmas_scenario: NegmasScenario | None = None,
     ):
         assert (
             not utility_functions or len(utility_functions) == 2
         )  # NOTE: Force 2 sides for now
+        self.negmas_scenario = negmas_scenario
         self.objectives = objectives
         self.utility_functions = utility_functions
         self.SW_outcome = SW_outcome
@@ -179,6 +182,11 @@ class Scenario:
 
     @classmethod
     def from_directory(cls, directory: Path, np_random=default_rng()):
+        negmas_scenario = None
+        if (directory / "negmas").is_dir():
+            negmas_scenario = NegmasScenario.load(
+                directory / "negmas", ignore_discount=True
+            )
         with open(directory / "objectives.json", "r") as f:
             objectives = {int(k): v for k, v in json.load(f).items()}
 
@@ -203,6 +211,7 @@ class Scenario:
                     name=specials.get("name", None),
                     src_path=specials.get("src_path", directory),
                     load_path=directory,
+                    negmas_scenario=negmas_scenario,
                 )
         else:
             utility_functions = [
@@ -215,6 +224,7 @@ class Scenario:
             name=directory.name,
             src_path=None,
             load_path=directory,
+            negmas_scenario=negmas_scenario,
         )
 
     def calculate_specials(self):
@@ -335,6 +345,9 @@ class Scenario:
         if directory.exists():
             rmtree(directory)
         directory.mkdir(parents=True)
+        if self.negmas_scenario is not None:
+            negpath = directory / "negmas"
+            NegmasScenario.to_genius_folder(self.negmas_scenario, negpath)
 
         with open(directory / "objectives.json", "w") as f:
             f.write(json.dumps(self.objectives, indent=2))

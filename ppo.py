@@ -1,9 +1,9 @@
 from os import cpu_count
 import random
 from typing import Any
+from tqdm import tqdm
 import time
 from rich import print
-from rich.progress import track
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -291,6 +291,7 @@ def main():
         "random_agent_order": args.random_agent_order,
         "issue_size": args.issue_size,
         "n_issues": args.n_issues,
+        "testing": False,
     }
 
     loader = ScenarioLoader(
@@ -315,7 +316,7 @@ def main():
     start_time = time.time()
 
     _strt = time.perf_counter()
-    for iteration in track(range(1, args.num_iterations + 1)):
+    for iteration in tqdm(range(1, args.num_iterations + 1)):
         if (
             args.scenario.startswith("environment/scenarios/random_tmp")
             or iteration == 1

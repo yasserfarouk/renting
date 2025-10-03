@@ -69,6 +69,7 @@ def evaluate_agent(opponent, model_path, args):
         "random_agent_order": args.random_agent_order,
         "issue_size": args.issue_size,
         "n_issues": args.n_issues,
+        "testing": True,
     }
     loader = ScenarioLoader(
         Path(f"environment/scenarios/testing/{args.exp}"), random=False
