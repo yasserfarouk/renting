@@ -1,3 +1,4 @@
+from os import cpu_count
 import random
 from typing import Any
 import time
@@ -135,7 +136,7 @@ class Args:
     learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
     # num_envs: int = 30
-    num_envs: int = 40
+    num_envs: int = int(0.8 * cpu_count())
     """the number of parallel game environments"""
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
@@ -242,6 +243,7 @@ def init_tensors(batch_size, envs, device) -> tuple[TensorDict, Tensor]:
 
 def main():
     args = tyro.cli(Args)
+    print(f"Will use {args.num_envs} environments")
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
