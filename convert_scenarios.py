@@ -117,8 +117,8 @@ def main(base: Path, extend=False):
                 n_vals = int(issue.cardinality)
                 for k, v in enumerate(issue.all):
                     vv = u.values[i](v)
-                    if vv < -1e-3 or vv > 1.0 + 1e-3:
-                        print(f"{u=}, {v=}, {vv=} -> setting it to 0 or 1")
+                    # if vv < -1e-3 or vv > 1.0 + 1e-3:
+                    #     print(f"{u=}, {v=}, {vv=} -> setting it to 0 or 1")
                     uinfo["value_weights"][str(i)][str(k)] = max(0.0, min(1.0, vv))
                 if n_vals < max_n_values:
                     for k in range(n_vals, max_n_values):
@@ -146,7 +146,7 @@ def main(base: Path, extend=False):
             )
             uinfo["name"] = u.name if u.name else ""
             dump(uinfo, dst / f"utility_function_{x}.json")
-    print(f"{max_n_issues=}\n{max_n_values=}")
+    print(f"{max_n_issues=}, {max_n_values=}")
 
 
 if __name__ == "__main__":
