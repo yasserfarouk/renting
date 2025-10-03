@@ -20,7 +20,7 @@ def get_n_issues_values(base: Path, dst_base: Path) -> tuple[int, int]:
         dst = dst_base / d.name
         if not d.is_dir():
             continue
-        scenario = NegmasScenario.load(d)
+        scenario = NegmasScenario.load(d, ignore_discount=True)
         assert scenario is not None
         assert isinstance(scenario.outcome_space, DiscreteCartesianOutcomeSpace)
         max_n_issues = max(max_n_issues, len(scenario.outcome_space.issues))
@@ -90,7 +90,7 @@ def main(base: Path, extend=False):
         )
         for u, x in zip(scenario.ufuns, ["A", "B"]):
             uinfo = dict()
-            assert isinstance(u, LinearAdditiveUtilityFunction)
+            assert isinstance(u, LinearAdditiveUtilityFunction), f"{type(u)}"
             weights = np.asarray(u.weights)
             weights = (
                 weights / weights.sum()
