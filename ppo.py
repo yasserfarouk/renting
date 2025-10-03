@@ -135,7 +135,7 @@ class Args:
     learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
     # num_envs: int = 30
-    num_envs: int = 2
+    num_envs: int = 40
     """the number of parallel game environments"""
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
