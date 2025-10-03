@@ -13,9 +13,7 @@ def select_one(x: list):
     return x[0] if x else None
 
 
-def get_n_issues_values(base: Path) -> tuple[int, int]:
-    dst_base = base.parent.parent / base.parent.name.replace("_src", "") / base.name
-    print(f"Saving to {dst_base}")
+def get_n_issues_values(base: Path, dst_base: Path) -> tuple[int, int]:
     max_n_issues = 0
     max_n_values = 0
     for d in base.iterdir():
@@ -32,8 +30,9 @@ def get_n_issues_values(base: Path) -> tuple[int, int]:
 
 
 def main(base: Path, extend=False):
-    dst_base = base.parent / base.name.replace("_src", "")
-    max_n_issues, max_n_values = get_n_issues_values(base)
+    dst_base = base.parent.parent / base.parent.name.replace("_src", "") / base.name
+    print(f"Saving to {dst_base}")
+    max_n_issues, max_n_values = get_n_issues_values(base, dst_base)
     if extend:
         print(f"Will extend to {max_n_issues} issues and {max_n_values} values each")
     for d in track(base.iterdir()):
@@ -146,7 +145,7 @@ def main(base: Path, extend=False):
             )
             uinfo["name"] = u.name if u.name else ""
             dump(uinfo, dst / f"utility_function_{x}.json")
-    print(f"{max_n_issues=}, {max_n_values=}")
+    print(f"{max_n_issues=}\n{max_n_values=}")
 
 
 if __name__ == "__main__":
