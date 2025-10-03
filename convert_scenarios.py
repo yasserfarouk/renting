@@ -39,7 +39,7 @@ def main(base: Path, extend=False):
         dst = dst_base / d.name
         if not d.is_dir():
             continue
-        scenario = NegmasScenario.load(d)
+        scenario = NegmasScenario.load(d, ignore_discount=True)
         assert scenario is not None
         dst.mkdir(parents=True, exist_ok=True)
         shutil.copytree(d, dst / "negmas")
