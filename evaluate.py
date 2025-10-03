@@ -12,10 +12,9 @@ import torch
 import tyro
 from tensordict import TensorDict
 
-from environment.agents.geniusweb import TESTING_AGENTS
 from environment.agents.policy.PPO import GNN
 from environment.negotiation import NegotiationEnvZoo
-from ppo import Args, Policies
+from ppo import Args, Policies, find_opponents
 from time import perf_counter
 
 
@@ -36,8 +35,8 @@ class ArgsEval(Args):
     training: bool = False
 
     def __post_init__(self):
-        self.training = False
         super().__post_init__()
+        self.opponent_types, self.opponent_map = find_opponents(False, self.exp)
         if self.method is not None:
             base = Path("models")
             if self.method:
@@ -59,7 +58,9 @@ def evaluate_agent(opponent, model_path, args):
     agent_type = model_path.split("/")[1].split("_")[0]
     exp = "_".join(model_path.split("/")[1].split("_")[1:]).split(".")[0]
     print(f"Evaluating {agent_type} for {exp} against {opponent}")
-    used_agents = [a for a in TESTING_AGENTS if a.startswith(tuple(args.opponent_sets))]
+    used_agents = [
+        a for a in args.opponent_map if a.startswith(tuple(args.opponent_sets))
+    ]
     env_config = {
         "agents": [f"RL_{agent_type}", opponent],
         "used_agents": used_agents,
@@ -187,7 +188,9 @@ def evaluate_agent(opponent, model_path, args):
 
 def main():
     args = tyro.cli(ArgsEval)
-    used_agents = [a for a in TESTING_AGENTS if a.startswith(tuple(args.opponent_sets))]
+    used_agents = [
+        a for a in args.opponent_map if a.startswith(tuple(args.opponent_sets))
+    ]
     assert args.model_paths is not None
     if args.debug:
         args.episodes = 5

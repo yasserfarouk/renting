@@ -131,6 +131,7 @@ class NegotiationEnvZoo(ParallelEnv):
                 agent_class = self.used_agents[agent]
                 agent_init = agent_class(agent, utility_function, self.deadline)
             else:
+                print(f"{agent} not in {self.used_agents}")
                 raise ValueError("Agent not recognized")
 
             self._agents.append(agent_init)

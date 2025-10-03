@@ -14,7 +14,8 @@ def select_one(x: list):
 
 
 def get_n_issues_values(base: Path) -> tuple[int, int]:
-    dst_base = base.parent / base.name.replace("_src", "")
+    dst_base = base.parent.parent / base.parent.name.replace("_src", "") / base.name
+    print(f"Saving to {dst_base}")
     max_n_issues = 0
     max_n_values = 0
     for d in base.iterdir():
@@ -149,4 +150,7 @@ def main(base: Path, extend=False):
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]), extend=sys.argv[2].startswith("--extend"))
+    main(
+        Path(sys.argv[1]),
+        extend=(len(sys.argv) > 2 and sys.argv[2].startswith("--extend")),
+    )

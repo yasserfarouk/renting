@@ -25,7 +25,7 @@ from supersuit.vector import MakeCPUAsyncConstructor
 from tensordict import TensorDict
 from torch import Tensor
 
-from environment.agents.geniusweb import TRAINING_AGENTS
+from environment.agents.geniusweb import TRAINING_AGENTS, TESTING_AGENTS
 from environment.agents.policy.PPO import GNN, HigaEtAl
 from environment.negotiation import NegotiationEnvZoo
 from environment.scenario import ScenarioLoader
@@ -44,9 +44,50 @@ class Policies(Enum):
     HigaEtAl = HigaEtAl
 
 
+def find_opponents(training: bool, exp: str) -> tuple[tuple[str, ...], dict[str, Any]]:
+    if exp in ("scml_dynamic",):
+        opponent_types = (
+            ("ConcederAgent", "BoulwareAgent") if training else ("LinearAgent",)
+        )
+    elif exp in (
+        "anac",
+        "acquisition",
+        "anac2024",
+        "camera",
+        "car",
+        "energy",
+        "grocery",
+        "itex",
+        "laptop",
+        "scml_dynamic",
+        "thompson",
+    ):
+        opponent_types = ("BoulwareAgent",) if training else ("BoulwareAgent",)
+    elif exp in ("anac2024",):
+        opponent_types = (
+            ("BoulwareAgent", "ConcederAgent") if training else ("BoulwareAgent",)
+        )
+    else:
+        opponent_types = (
+            ("BoulwareAgent", "ConcederAgent") if training else ("BoulwareAgent",)
+        )
+
+    base_map = TRAINING_AGENTS if training else TESTING_AGENTS
+    opponent_map = {
+        k: v for k, v in base_map.items() if any(_ in k for _ in opponent_types)
+    }
+    if not opponent_map:
+        print(base_map)
+        print(opponent_types)
+    print(
+        f"Will use opponents {opponent_types} for {'training' if training else 'testing'}"
+    )
+    print(opponent_map)
+    return opponent_types, opponent_map
+
+
 @dataclass
 class Args:
-    training: bool = True
     debug: bool = False
     deadline: int = 100
     time_limit: int = 10000
@@ -132,7 +173,7 @@ class Args:
     """Maximum allowed number of issues"""
 
     opponent_types: tuple[str, ...] | None = None
-    opponent_map: dict[str, Any] = TRAINING_AGENTS
+    opponent_map: dict[str, Any] | None = None
 
     def __post_init__(self):
         self.scenario = f"environment/scenarios/random_tmp_{self.exp}"
@@ -145,44 +186,7 @@ class Args:
                 self.total_timesteps = 100_000
 
         if self.opponent_types is None:
-            self.opponent_map = TRAINING_AGENTS
-            if exp in ("scml_dynamic",):
-                self.opponent_types = (
-                    ("ConcederAgent", "BoulwareAgent")
-                    if self.training
-                    else ("LineaerAgent",)
-                )
-            elif exp in (
-                "anac",
-                "acquisition",
-                "anac2024",
-                "camera",
-                "car",
-                "energy",
-                "grocery",
-                "itex",
-                "laptop",
-                "scml_dynamic",
-                "thompson",
-            ):
-                self.opponent_types = (
-                    ("BoulwareAgent",) if self.training else ("BoulwareAgent",)
-                )
-            elif exp in ("anac2024",):
-                self.opponent_types = (
-                    ("BoulwareAgent", "ConcederAgent")
-                    if self.training
-                    else ("BoulwareAgent",)
-                )
-
-            self.opponent_map = {
-                k: v
-                for k, v in TRAINING_AGENTS
-                if any(_ in k for _ in self.opponent_types)
-            }
-            print(
-                f"Will use opponents {self.opponent_types} for {'training' if self.training else 'testing'}"
-            )
+            self.opponent_types, self.opponent_mape = find_opponents(True, self.exp)
 
         # if self.exp == "scml_dynamic":
         #     self.issue_size = max(self.issue_size, 20)

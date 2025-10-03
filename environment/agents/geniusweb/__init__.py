@@ -30,18 +30,5 @@ ALL_AGENTS.update(
     {f"CSE3210_{k}": geniusweb_wrapper(v) for k, v in CSE3210_AGENTS.items()}
 )
 
-TRAINING_AGENTS.update(
-    {
-        f"BASIC_{k}": geniusweb_wrapper(v)
-        for k, v in BASIC_AGENTS.items()
-        if k in ("BoulwareAgent", "ConcederAgent")
-    }
-)
-
-TESTING_AGENTS.update(
-    {
-        f"BASIC_{k}": geniusweb_wrapper(v)
-        for k, v in BASIC_AGENTS.items()
-        if k in ("LinearAgent",)
-    }
-)
+TRAINING_AGENTS = ALL_AGENTS.copy()
+TESTING_AGENTS = ALL_AGENTS.copy()
