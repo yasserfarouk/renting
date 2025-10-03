@@ -1,4 +1,5 @@
 import random
+from typing import Any
 import time
 from rich import print
 from rich.progress import track
@@ -24,7 +25,7 @@ from supersuit.vector import MakeCPUAsyncConstructor
 from tensordict import TensorDict
 from torch import Tensor
 
-from environment.agents.geniusweb import AGENTS
+from environment.agents.geniusweb import TRAINING_AGENTS
 from environment.agents.policy.PPO import GNN, HigaEtAl
 from environment.negotiation import NegotiationEnvZoo
 from environment.scenario import ScenarioLoader
@@ -45,6 +46,7 @@ class Policies(Enum):
 
 @dataclass
 class Args:
+    training: bool = True
     debug: bool = False
     deadline: int = 100
     time_limit: int = 10000
@@ -129,15 +131,58 @@ class Args:
     n_issues = 0
     """Maximum allowed number of issues"""
 
+    opponent_types: tuple[str, ...] | None = None
+    opponent_map: dict[str, Any] = TRAINING_AGENTS
+
     def __post_init__(self):
         self.scenario = f"environment/scenarios/random_tmp_{self.exp}"
         if self.total_timesteps < 1:
             if self.exp in ("scml_dynamic", "anac2024"):
                 self.total_timesteps = 400_000
-            elif self.exp in ("anac", "mipn"):
+            elif self.exp in ("anac",):
                 self.total_timesteps = 200_000
             else:
-                self.total_timesteps = 400_000
+                self.total_timesteps = 100_000
+
+        if self.opponent_types is None:
+            self.opponent_map = TRAINING_AGENTS
+            if exp in ("scml_dynamic",):
+                self.opponent_types = (
+                    ("ConcederAgent", "BoulwareAgent")
+                    if self.training
+                    else ("LineaerAgent",)
+                )
+            elif exp in (
+                "anac",
+                "acquisition",
+                "anac2024",
+                "camera",
+                "car",
+                "energy",
+                "grocery",
+                "itex",
+                "laptop",
+                "scml_dynamic",
+                "thompson",
+            ):
+                self.opponent_types = (
+                    ("BoulwareAgent",) if self.training else ("BoulwareAgent",)
+                )
+            elif exp in ("anac2024",):
+                self.opponent_types = (
+                    ("BoulwareAgent", "ConcederAgent")
+                    if self.training
+                    else ("BoulwareAgent",)
+                )
+
+            self.opponent_map = {
+                k: v
+                for k, v in TRAINING_AGENTS
+                if any(_ in k for _ in self.opponent_types)
+            }
+            print(
+                f"Will use opponents {self.opponent_types} for {'training' if self.training else 'testing'}"
+            )
 
         # if self.exp == "scml_dynamic":
         #     self.issue_size = max(self.issue_size, 20)
@@ -228,7 +273,9 @@ def main():
     )
 
     # env setup
-    used_agents = [a for a in AGENTS if a.startswith(tuple(args.opponent_sets))]
+    used_agents = [
+        a for a in args.opponent_map if a.startswith(tuple(args.opponent_sets))
+    ]
     env_config = {
         "agents": [f"RL_{args.policy.name}", args.opponent],
         "used_agents": used_agents,
@@ -240,7 +287,9 @@ def main():
         "n_issues": args.n_issues,
     }
 
-    loader = ScenarioLoader(Path(f"environment/scenarios/{args.exp}"), random=True)
+    loader = ScenarioLoader(
+        Path(f"environment/scenarios/training/{args.exp}"), random=True
+    )
     if args.scenario.startswith("environment/scenarios/random_tmp"):
         scenario = loader.random_scenario()
         scenario.to_directory(Path(args.scenario))
@@ -457,10 +506,10 @@ def main():
             )
         # print("SPS:", int(global_step / (time.time() - start_time)))
         model_path = f"models/{run_name}"
-        print(f"Will save the model to {model_path}")
-
+        # print(f"Will save the model to {model_path}")
         torch.save(agent.state_dict(), model_path)
 
+    print(f"Model saved to to {model_path}")
     envs.close()
     total_time = time.perf_counter() - _strt
 

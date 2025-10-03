@@ -4,18 +4,18 @@ import pytest
 import numpy as np
 from numpy.random import default_rng
 
-from environment.agents.geniusweb import AGENTS
+from environment.agents.geniusweb import TRAINING_AGENTS
 from environment.negotiation import Deadline
 from environment.scenario import Scenario
 
 
-@pytest.mark.parametrize("agent_class", AGENTS.values())
+@pytest.mark.parametrize("agent_class", TRAINING_AGENTS.values())
 def test_initialisation(agent_class):
     scenario = Scenario.create_random(400, default_rng())
     agent_class("test", scenario.utility_functions[0], Deadline(10000), {})
 
 
-@pytest.mark.parametrize("agent_class", AGENTS.values())
+@pytest.mark.parametrize("agent_class", TRAINING_AGENTS.values())
 def test_opening_bid(agent_class):
     scenario = Scenario.create_random(400, default_rng())
     agent = agent_class("test", scenario.utility_functions[0], Deadline(10000), {})
@@ -23,7 +23,7 @@ def test_opening_bid(agent_class):
     agent.select_action(last_actions)
 
 
-@pytest.mark.parametrize("agent_class", AGENTS.values())
+@pytest.mark.parametrize("agent_class", TRAINING_AGENTS.values())
 def test_accept_first_offer(agent_class):
     last_actions = deque()
     scenario = Scenario.create_random(400, default_rng())
@@ -39,10 +39,12 @@ def test_accept_first_offer(agent_class):
     agent.final(last_actions)
 
 
-@pytest.mark.parametrize("agent_class", AGENTS.values())
+@pytest.mark.parametrize("agent_class", TRAINING_AGENTS.values())
 def test_round_deadline(agent_class):
     scenario = Scenario.create_random(400, default_rng())
-    outcome = np.array(scenario.utility_functions[1].max_utility_outcome, dtype=np.int64)
+    outcome = np.array(
+        scenario.utility_functions[1].max_utility_outcome, dtype=np.int64
+    )
     last_actions = deque()
     bid = {"agent_id": "opponent", "outcome": outcome, "accept": 0}
     agent = agent_class("test", scenario.utility_functions[0], Deadline(10000, 10), {})
@@ -58,7 +60,7 @@ def test_round_deadline(agent_class):
         assert agent._session_progress.get(None) < 1
     else:
         raise ValueError("Agent does not have progress attribute")
-    
+
     agent.select_action(last_actions)
 
     if hasattr(agent, "progress"):

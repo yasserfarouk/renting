@@ -14,7 +14,7 @@ from geniusweb.party.DefaultParty import DefaultParty
 from numpy.random import default_rng
 from pettingzoo import ParallelEnv
 
-from environment.agents.geniusweb import AGENTS
+from environment.agents.geniusweb import TRAINING_AGENTS
 from environment.agents.rl_agent import GraphObs, HigaEtAl, RLAgent
 from environment.deadline import Deadline
 from environment.scenario import Scenario
@@ -48,7 +48,7 @@ class NegotiationEnvZoo(ParallelEnv):
             self.scenario = Scenario.from_directory(Path(env_config["scenario"]))
 
         self.env_config = env_config
-        self.used_agents = {a: AGENTS[a] for a in env_config["used_agents"]}
+        self.used_agents = {a: TRAINING_AGENTS[a] for a in env_config["used_agents"]}
 
     def observation_space(self, agent):
         return REQUIRED_RL_AGENT[agent.split("_")[1]].observation_space(
@@ -268,6 +268,8 @@ class NegotiationEnvZoo(ParallelEnv):
                 metrics = asdict(
                     calc_outcome_optimality(dists, stats_, estimate_max_dist(neg.ufuns))
                 )
+                print(metrics)
+                breakpoint()
 
         infos = {
             agent.agent_id: {

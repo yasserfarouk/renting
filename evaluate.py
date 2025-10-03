@@ -12,7 +12,7 @@ import torch
 import tyro
 from tensordict import TensorDict
 
-from environment.agents.geniusweb import AGENTS
+from environment.agents.geniusweb import TESTING_AGENTS
 from environment.agents.policy.PPO import GNN
 from environment.negotiation import NegotiationEnvZoo
 from ppo import Args, Policies
@@ -30,10 +30,13 @@ class ArgsEval(Args):
     episodes: int = 50
 
     # extension parameters
-    issue_size = 0
-    n_issues = 0
+    issue_size: int = 0
+    n_issues: int = 0
+
+    training: bool = False
 
     def __post_init__(self):
+        self.training = False
         super().__post_init__()
         if self.method is not None:
             base = Path("models")
@@ -55,8 +58,8 @@ class ArgsEval(Args):
 def evaluate_agent(opponent, model_path, args):
     agent_type = model_path.split("/")[1].split("_")[0]
     exp = "_".join(model_path.split("/")[1].split("_")[1:]).split(".")[0]
-    print(f"Evaluating {agent_type} on {exp}")
-    used_agents = [a for a in AGENTS if a.startswith(tuple(args.opponent_sets))]
+    print(f"Evaluating {agent_type} for {exp} against {opponent}")
+    used_agents = [a for a in TESTING_AGENTS if a.startswith(tuple(args.opponent_sets))]
     env_config = {
         "agents": [f"RL_{agent_type}", opponent],
         "used_agents": used_agents,
@@ -67,7 +70,7 @@ def evaluate_agent(opponent, model_path, args):
         "n_issues": args.n_issues,
     }
     loader = ScenarioLoader(
-        Path(f"environment/scenarios/{args.exp}_testing"), random=False
+        Path(f"environment/scenarios/testing/{args.exp}"), random=False
     )
     loader.random_scenario().to_directory(Path(env_config["scenario"]))
     env = NegotiationEnvZoo(env_config)
@@ -127,8 +130,10 @@ def evaluate_agent(opponent, model_path, args):
         log_metrics["self_accepted"].append(info["self_accepted"])
         log_metrics["found_agreement"].append(info["found_agreement"])
         log_metrics["agreement"].append(info["found_agreement"])
-        log_metrics["pareto_optimality"].append(info["pareto_optimality"])
-        log_metrics["nash_optimality"].append(info["nash_optimality"])
+        log_metrics["pareto_optimality"].append(
+            info.get("pareto_optimality", float("nan"))
+        )
+        log_metrics["nash_optimality"].append(info.get("nash_optimality", float("nan")))
         log_metrics["kalai_optimality"].append(
             info.get("kalai_optimality", float("nan"))
         )
@@ -157,8 +162,8 @@ def evaluate_agent(opponent, model_path, args):
                 time=t_,
                 step=total_steps,
                 relative_time=rtime,
-                pareto_optimality=info["pareto_optimality"],
-                nash_optimality=info["nash_optimality"],
+                pareto_optimality=info.get("pareto_optimality", float("nan")),
+                nash_optimality=info.get("nash_optimality", float("nan")),
                 kalai_optimality=info.get("kalai_optimality", float("nan")),
                 modified_kalai_optimality=info.get(
                     "modified_kalai_optimality", float("nan")
@@ -171,13 +176,18 @@ def evaluate_agent(opponent, model_path, args):
 
     mm_ = {f"{k}_mean": np.mean(v) for k, v in log_metrics.items()}
     mm_ |= {f"{k}_std": np.std(v) for k, v in log_metrics.items()}
+    mm_ |= {
+        "episodes": args.episodes,
+        "n_negotiations": len(log_metrics),
+        "model_path": model_path,
+    }
 
     return mm_, detailed_metrics, opponent
 
 
 def main():
     args = tyro.cli(ArgsEval)
-    used_agents = [a for a in AGENTS if a.startswith(tuple(args.opponent_sets))]
+    used_agents = [a for a in TESTING_AGENTS if a.startswith(tuple(args.opponent_sets))]
     assert args.model_paths is not None
     if args.debug:
         args.episodes = 5
@@ -186,6 +196,7 @@ def main():
         # print(details)
     # else:
     if 1:
+        print("Saving ...")
         iterables = [list(range(len(args.model_paths))), sorted(used_agents)]
         index = pd.MultiIndex.from_product(iterables, names=["model", "opponent"])
         data = pd.DataFrame(
@@ -213,12 +224,12 @@ def main():
             for opponent in used_agents:
                 metrics, details, opp = evaluate_agent(opponent, model_path, args)
                 details_ += details
-                results.append(metrics, opp)
+                results.append((metrics, opp))
             for result in results:
                 data.loc[(i, result[1]), result[0].keys()] = list(result[0].values())
-        data.to_csv(SAVE_LOC / "evaluation.csv")
+        data.to_csv(save_loc / "evaluation.csv")
         pd.DataFrame.from_records(details_).to_csv(
-            SAVE_LOC / "details.csv", index=False
+            save_loc / "details.csv", index=False
         )
         if args.debug:
             # metrics, details, opp = evaluate_agent(

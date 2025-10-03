@@ -10,8 +10,8 @@ from .stupid_agent.stupid_agent import StupidAgent
 AGENTS: dict[str, DefaultParty] = {
     "BoulwareAgent": BoulwareAgent,
     "ConcederAgent": ConcederAgent,
-    # "HardlinerAgent": HardlinerAgent, #NOTE: disabled because of useless behaviour
+    "HardlinerAgent": HardlinerAgent,  # NOTE: disabled because of useless behaviour
     "LinearAgent": LinearAgent,
     "RandomAgent": RandomAgent,
-    # "StupidAgent": StupidAgent, #NOTE: disabled because test agent
+    "StupidAgent": StupidAgent,  # NOTE: disabled because test agent
 }

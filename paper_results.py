@@ -15,7 +15,7 @@ import tyro
 from numpy.random import default_rng
 from tensordict import TensorDict
 
-from environment.agents.geniusweb import AGENTS
+from environment.agents.geniusweb import TRAINING_AGENTS
 from environment.agents.policy.PPO import GNN
 from environment.scenario import ScenarioLoader
 from ppo import Args, Policies, concat_envs
@@ -110,7 +110,9 @@ def main():
     )
 
     # env setup
-    used_agents = [a for a in AGENTS if a.startswith(tuple(test_data["opponent_sets"]))]
+    used_agents = [
+        a for a in TRAINING_AGENTS if a.startswith(tuple(test_data["opponent_sets"]))
+    ]
     args.episodes = args.episodes_per_agent * len(used_agents)
     args.episodes_per_scenario = args.episodes_per_scenario_per_agent * len(used_agents)
     envs = None
