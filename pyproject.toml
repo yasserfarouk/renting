@@ -19,13 +19,18 @@ dependencies = [
     "supersuit==3.9.2",
     "tyro==0.7.2",
     "pandas==2.2.0",
-    "geniuswebcore @ https://tracinsy.ewi.tudelft.nl/pubtrac/GeniusWebPython/export/100/geniuswebcore/dist/geniusweb-1.2.1.tar.gz",
-	"negmas @ file:///${PROJECT_ROOT}/../negmas"
 ]
 
 [project.optional-dependencies]
 test = [
     "pytest",
+]
+genius = [
+    "geniuswebcore @ https://tracinsy.ewi.tudelft.nl/pubtrac/GeniusWebPython/export/100/geniuswebcore/dist/geniusweb-1.2.1.tar.gz",
+]
+negmas = [
+	"negmas",
+	# "negmas @ file:///${PROJECT_ROOT}/../negmas"
 ]
 
 [tool.uv]
