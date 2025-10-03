@@ -13,6 +13,7 @@ from uuid import uuid4
 
 import numpy as np
 from geniusweb.actions.Accept import Accept
+from geniusweb.actions.EndNegotiation import EndNegotiation
 from geniusweb.actions.Action import Action
 from geniusweb.actions.ActionWithBid import ActionWithBid
 from geniusweb.actions.Offer import Offer
@@ -39,7 +40,9 @@ from environment.scenario import UtilityFunction
 
 def geniusweb_wrapper(base):
     class GeniusWebAgent(base):  # TODO: set to base
-        def __init__(self, agent_id: str, utility_function, deadline, parameters: dict = {}):
+        def __init__(
+            self, agent_id: str, utility_function, deadline, parameters: dict = {}
+        ):
             super().__init__(DummyReporter())
             self.agent_id = agent_id
             self.utility_function = utility_function
@@ -130,9 +133,11 @@ def geniusweb_wrapper(base):
                 action = self.action
                 self.action = None
             else:
-                raise ValueError(
-                    f"Action cannot be None, agent_id: {type(self).__name__}"
-                )
+                # end negotiation on protocol breach
+                action = EndNegotiation(self.ID)
+                # raise ValueError(
+                #     f"Action cannot be None, agent_id: {type(self).__name__}"
+                # )
 
             self.notifyChange(ActionDone(action))
 
@@ -163,12 +168,17 @@ def geniusweb_wrapper(base):
                 action_dict = {"accept": np.int64(0)}
             elif isinstance(action, Accept):
                 action_dict = {"accept": np.int64(1)}
+            elif isinstance(action, EndNegotiation):
+                action_dict = {"accept": np.int64(0), "end": np.int64(1)}
             else:
                 raise ValueError(f"Action {action} not supported")
 
-            issue_values = action._bid._issuevalues
-            outcome = [int(issue_values[str(i)]._value) for i in range(len(issue_values))]
-            action_dict["outcome"] = np.array(outcome, dtype=np.int64)
+            if isinstance(action, ActionWithBid):
+                issue_values = action._bid._issuevalues
+                outcome = [
+                    int(issue_values[str(i)]._value) for i in range(len(issue_values))
+                ]
+                action_dict["outcome"] = np.array(outcome, dtype=np.int64)
             action_dict["agent_id"] = self.agent_id
 
             return action_dict

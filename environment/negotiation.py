@@ -170,8 +170,13 @@ class NegotiationEnvZoo(ParallelEnv):
                 action["agent_id"] = self.current_agent.agent_id
             self.register_action(action)
 
-        while not self.deadline.reached() and (
-            len(self.last_actions) < 1 or not self.last_actions[-1]["accept"]
+        while (
+            not self.deadline.reached()
+            and (
+                len(self.last_actions) < 1
+                or not self.last_actions[-1].get("end", False)
+            )
+            and (len(self.last_actions) < 1 or not self.last_actions[-1]["accept"])
         ):
             self.current_agent = next(self.agents_iter)
 

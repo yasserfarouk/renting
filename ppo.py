@@ -90,6 +90,7 @@ def find_opponents(training: bool, exp: str) -> tuple[tuple[str, ...], dict[str,
 @dataclass
 class Args:
     debug: bool = False
+    retrain: bool = True
     deadline: int = 100
     time_limit: int = 10000
     policy: Policies = Policies.GNN
@@ -243,6 +244,14 @@ def init_tensors(batch_size, envs, device) -> tuple[TensorDict, Tensor]:
 
 def main():
     args = tyro.cli(Args)
+    run_name_base = f"{args.policy.name}_{args.exp}"
+    run_name = (
+        f"{run_name_base}.{datetime.now().strftime('%y-%m-%d_%H:%M:%S')}_{uuid4()}"
+    )
+    models = [_.name for _ in Path("models").glob(f"{run_name_base}.*")]
+    if not args.retrain and any(_.startswith(run_name_base) for _ in models):
+        print(f"Found existing model at {run_name}, will not retrain")
+        return
     print(f"Will use {args.num_envs} environments")
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
@@ -253,8 +262,6 @@ def main():
         args.minibatch_size = 20
         args.num_iterations = 2
         args.update_epochs = 1
-
-    run_name = f"{args.policy.name}_{args.exp}.{datetime.now().strftime('%y-%m-%d_%H:%M:%S')}_{uuid4()}"
 
     if args.wandb:
         import wandb
