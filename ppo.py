@@ -186,7 +186,7 @@ class Args:
                 self.total_timesteps = 100_000
 
         if self.opponent_types is None:
-            self.opponent_types, self.opponent_mape = find_opponents(True, self.exp)
+            self.opponent_types, self.opponent_map = find_opponents(True, self.exp)
 
         # if self.exp == "scml_dynamic":
         #     self.issue_size = max(self.issue_size, 20)
