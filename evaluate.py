@@ -1,5 +1,6 @@
 from collections import defaultdict
 from pathlib import Path
+from negmas.helpers import unique_name
 from rich import print
 from rich.progress import track
 from dataclasses import dataclass
@@ -16,6 +17,9 @@ from environment.agents.policy.PPO import GNN
 from environment.negotiation import NegotiationEnvZoo
 from ppo import Args, Policies
 from time import perf_counter
+
+
+SAVE_LOC = Path.home() / "negmas" / "external" / "renting"
 
 
 @dataclass
@@ -177,17 +181,15 @@ def main():
     assert args.model_paths is not None
     if args.debug:
         args.episodes = 5
-        metrics, details, opp = evaluate_agent(
-            used_agents[0], args.model_paths[0], args
-        )
-        print(metrics)
-        print([_["scenario_src_path"] for _ in details])
-        print(details)
-    else:
+        used_agents = used_agents[:1]
+        args.model_paths = args.model_paths[:1]
+        # print(details)
+    # else:
+    if 1:
         iterables = [list(range(len(args.model_paths))), sorted(used_agents)]
         index = pd.MultiIndex.from_product(iterables, names=["model", "opponent"])
         data = pd.DataFrame(
-            columns=[
+            columns=[  # type: ignore
                 "my_utility",
                 "opp_utility",
                 "rounds_played",
@@ -198,8 +200,15 @@ def main():
         )
         details_ = []
 
+        save_loc = (
+            SAVE_LOC
+            / (args.exp if args.exp else "unknown")
+            / args.method
+            / unique_name("", sep="")
+        )
+        save_loc.mkdir(parents=True, exist_ok=True)
         for i, model_path in enumerate(args.model_paths):
-            print(f"{i} of {len(args.model_paths)}")
+            print(f"{i} of {len(args.model_paths)}: {model_path}")
             results = []
             for opponent in used_agents:
                 metrics, details, opp = evaluate_agent(opponent, model_path, args)
@@ -207,10 +216,16 @@ def main():
                 results.append(metrics, opp)
             for result in results:
                 data.loc[(i, result[1]), result[0].keys()] = list(result[0].values())
-        data.to_csv("analysis/data/evaluation.csv")
+        data.to_csv(SAVE_LOC / "evaluation.csv")
         pd.DataFrame.from_records(details_).to_csv(
-            "analysis/data/details.csv", index=False
+            SAVE_LOC / "details.csv", index=False
         )
+        if args.debug:
+            # metrics, details, opp = evaluate_agent(
+            #     used_agents[0], args.model_paths[0], args
+            # )
+            print([_["scenario_src_path"] for _ in details])
+            print(metrics)
 
 
 if __name__ == "__main__":

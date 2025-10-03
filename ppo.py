@@ -455,7 +455,7 @@ def main():
             logger.log(
                 {"SPS": int(global_step / (time.time() - start_time))}, global_step
             )
-        print("SPS:", int(global_step / (time.time() - start_time)))
+        # print("SPS:", int(global_step / (time.time() - start_time)))
         model_path = f"models/{run_name}"
         print(f"Will save the model to {model_path}")
 
