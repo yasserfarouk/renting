@@ -126,9 +126,15 @@ def main(base: Path, extend=False):
                 uinfo["value_weights"][str(i)] = dict()
                 for k in range(max_n_values):
                     uinfo["value_weights"][str(i)][str(k)] = 0.0
-            assert len(uinfo["value_weights"]) == (max_n_issues if extend else n_issues)
+            assert len(uinfo["value_weights"]) == (
+                max_n_issues if extend else n_issues
+            ), (
+                f"{len(uinfo['value_weights'])=}, {n_issues=}, {max_n_issues=}, {extend=}"
+            )
             assert len(uinfo["objective_weights"]) == (
                 max_n_issues if extend else n_issues
+            ), (
+                f"{len(uinfo['objective_weights'])=}, {n_issues=}, {max_n_issues=}, {extend=}"
             )
             for i, issue in enumerate(scenario.outcome_space.issues):
                 assert len(uinfo["value_weights"][str(i)]) == (
