@@ -21,7 +21,7 @@ def get_n_issues_values(base: Path, dst_base: Path) -> tuple[int, int]:
         if not d.is_dir():
             continue
         scenario = NegmasScenario.load(d, ignore_discount=True)
-        assert scenario is not None
+        assert scenario is not None, f"Failed to load {d}"
         assert isinstance(scenario.outcome_space, DiscreteCartesianOutcomeSpace)
         max_n_issues = max(max_n_issues, len(scenario.outcome_space.issues))
         for i, issue in enumerate(scenario.outcome_space.issues):

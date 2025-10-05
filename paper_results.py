@@ -135,7 +135,7 @@ def main():
     )
 
     loader = ScenarioLoader(
-        Path(f"environment/scenarios/{args.exp}_testing"), random=False
+        Path(f"environment/scenarios/{args.exp}_testing"), random_order=False
     )
     for model_index, model_path in enumerate(test_data["models"]):
         print(f"model_index: {model_index}")

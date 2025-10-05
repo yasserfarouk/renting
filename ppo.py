@@ -90,6 +90,7 @@ def find_opponents(training: bool, exp: str) -> tuple[tuple[str, ...], dict[str,
 @dataclass
 class Args:
     debug: bool = False
+    verbose: bool = False
     retrain: bool = True
     deadline: int = 100
     time_limit: int = 10000
@@ -302,7 +303,7 @@ def main():
     }
 
     loader = ScenarioLoader(
-        Path(f"environment/scenarios/training/{args.exp}"), random=True
+        Path(f"environment/scenarios/training/{args.exp}"), random_order=True
     )
     if args.scenario.startswith("environment/scenarios/random_tmp"):
         scenario = loader.random_scenario()
@@ -330,6 +331,14 @@ def main():
         ):
             if args.scenario.startswith("environment/scenarios/random_tmp"):
                 scenario = loader.next_scenario()
+                if args.verbose:
+                    print(f"Loading scenario {scenario.name} from {scenario.src_path}")
+                    if scenario.negmas_scenario:
+                        print(f"{scenario.negmas_scenario.outcome_space.name=}")
+                        for u in scenario.negmas_scenario.ufuns:
+                            print(f"{type(u)}\t{u.weights=}\n\t{u.values=}")  # type: ignore
+                    else:
+                        print("No negmas scenario loaded")
                 # scenario = Scenario.create_random([200, 1000], scenario_rng, 5, True)
                 scenario.to_directory(Path(args.scenario))
 

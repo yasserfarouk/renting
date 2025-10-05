@@ -178,6 +178,8 @@ class NegotiationEnvZoo(ParallelEnv):
             )
             and (len(self.last_actions) < 1 or not self.last_actions[-1]["accept"])
         ):
+            if len(self.last_actions) > 0 and self.last_actions[-1].get("end", False):
+                break
             self.current_agent = next(self.agents_iter)
 
             if isinstance(self.current_agent, RLAgent):
@@ -191,6 +193,8 @@ class NegotiationEnvZoo(ParallelEnv):
                     obs = self.current_agent.get_observation(
                         self.last_actions, self.deadline, self.opponent_encoding
                     )
+                    if not obs:
+                        break
                     obs = {self.current_agent.agent_id: obs}
                     rews = {self.current_agent.agent_id: 0}
                     return (

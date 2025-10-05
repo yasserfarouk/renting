@@ -169,7 +169,7 @@ def geniusweb_wrapper(base):
             elif isinstance(action, Accept):
                 action_dict = {"accept": np.int64(1)}
             elif isinstance(action, EndNegotiation):
-                action_dict = {"accept": np.int64(0), "end": np.int64(1)}
+                action_dict = {"accept": np.int64(0), "end": True}
             else:
                 raise ValueError(f"Action {action} not supported")
 

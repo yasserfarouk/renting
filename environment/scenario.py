@@ -505,13 +505,14 @@ class Scenario:
 class ScenarioLoader:
     path: Path
     nxt: int = 0
+    random_order: bool = False
     random: bool = False
     _files: list[Path] = field(init=False, default_factory=list)
 
     def __post_init__(self):
         assert self.path.exists() and self.path.is_dir()
         self._files = [f for f in self.path.iterdir() if f.is_dir()]
-        if self.random:
+        if self.random_order:
             shuffle(self._files)
         else:
             self._files.sort()
@@ -524,6 +525,8 @@ class ScenarioLoader:
 
     def next_scenario(self):
         """Next scenario"""
+        if self.random:
+            return self.random_scenario()
         s = self._files[self.nxt]
         self.nxt = (self.nxt + 1) % len(self._files)
         return Scenario.from_directory(s)

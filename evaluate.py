@@ -72,7 +72,7 @@ def evaluate_agent(opponent, model_path, args):
         "testing": True,
     }
     loader = ScenarioLoader(
-        Path(f"environment/scenarios/testing/{args.exp}"), random=False
+        Path(f"environment/scenarios/testing/{args.exp}"), random_order=False
     )
     loader.random_scenario().to_directory(Path(env_config["scenario"]))
     env = NegotiationEnvZoo(env_config)

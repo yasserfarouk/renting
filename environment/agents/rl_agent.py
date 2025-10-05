@@ -186,12 +186,14 @@ class GraphObs(RLAgent):
             accept_mask[1] = False
         if len(last_actions) > 0:
             self.register_opp_action(last_actions[-1])
-            outcome = self._extend_action(last_actions[-1]["outcome"])
-            opp_outcome[self.value_offset + outcome] = 1
+            if "outcome" in last_actions[-1]:
+                outcome = self._extend_action(last_actions[-1]["outcome"])
+                opp_outcome[self.value_offset + outcome] = 1
         if len(last_actions) > 1:
             self.register_my_action(last_actions[-2])
-            outcome = self._extend_action(last_actions[-2]["outcome"])
-            my_outcome[self.value_offset + outcome] = 1
+            if "outcome" in last_actions[-1]:
+                outcome = self._extend_action(last_actions[-2]["outcome"])
+                my_outcome[self.value_offset + outcome] = 1
 
         obs = {
             "head_node": np.array(
@@ -222,12 +224,16 @@ class GraphObs(RLAgent):
         return np.asarray(list(outcome) + [0] * (n - n_given))
 
     def register_opp_action(self, action: dict):
+        if "outcome" not in action:
+            return
         w = self.value_offset + self._extend_action(action["outcome"])
         self.num_opp_actions += 1
         self.counted_opp_outcomes[w] += 1
         self.fraction_opp_outcomes = self.counted_opp_outcomes / self.num_opp_actions
 
     def register_my_action(self, action: dict):
+        if "outcome" not in action:
+            return
         w = self.value_offset + self._extend_action(action["outcome"])
         self.num_my_actions += 1
         self.counted_my_outcomes[w] += 1
