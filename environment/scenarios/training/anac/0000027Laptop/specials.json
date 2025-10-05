@@ -1,0 +1,93 @@
+{
+  "distribution": null,
+  "kalai": {
+    "outcome": [
+      "Macintosh",
+      "60 Gb",
+      "19'' LCD"
+    ],
+    "utility": [
+      [
+        0.7715533992081258,
+        0.8450562871935449
+      ]
+    ]
+  },
+  "load_path": null,
+  "name": "0000027Laptop",
+  "nash": {
+    "outcome": [
+      "Macintosh",
+      "60 Gb",
+      "19'' LCD"
+    ],
+    "utility": [
+      [
+        0.7715533992081258,
+        0.8450562871935449
+      ]
+    ]
+  },
+  "opposition": 0.27603514912346067,
+  "pareto_front": [
+    {
+      "outcome": [
+        "Macintosh",
+        "60 Gb",
+        "19'' LCD"
+      ],
+      "utility": [
+        0.7715533992081258,
+        0.8450562871935449
+      ]
+    },
+    {
+      "outcome": [
+        "Macintosh",
+        "80 Gb",
+        "19'' LCD"
+      ],
+      "utility": [
+        0.5775524426410948,
+        1.0
+      ]
+    },
+    {
+      "outcome": [
+        "HP",
+        "60 Gb",
+        "19'' LCD"
+      ],
+      "utility": [
+        1.0,
+        0.5136317604069092
+      ]
+    },
+    {
+      "outcome": [
+        "HP",
+        "80 Gb",
+        "19'' LCD"
+      ],
+      "utility": [
+        0.805999043432969,
+        0.6685754732133643
+      ]
+    }
+  ],
+  "size": 27,
+  "social_welfare": {
+    "outcome": [
+      "Macintosh",
+      "60 Gb",
+      "19'' LCD"
+    ],
+    "utility": [
+      [
+        0.7715533992081258,
+        0.8450562871935449
+      ]
+    ]
+  },
+  "src_path": "environment/scenarios/training_src/anac/0000027Laptop"
+}
