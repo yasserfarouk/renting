@@ -309,6 +309,11 @@ def main():
     )
     if args.scenario.startswith("environment/scenarios/random_tmp"):
         scenario = loader.random_scenario()
+        if args.verbose:
+            print(
+                f"Training on scenario {scenario.name} of size {scenario.size}",
+                flush=True,
+            )
         scenario.to_directory(Path(args.scenario))
     envs = concat_envs(env_config, args.num_envs, num_cpus=args.num_envs)
 

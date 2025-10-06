@@ -96,6 +96,11 @@ def evaluate_agent(opponent, model_path, args):
                 # scenario = Scenario.create_random(
                 #     [200, 1000], scenario_rng, 5, True
                 # )
+                if args.verbose:
+                    print(
+                        f"Testing on scenario {scenario.name} of size {scenario.size}",
+                        flush=True,
+                    )
                 scenario.to_directory(Path(env_config["scenario"]))
         next_obs = env.reset(seed=args.seed + episode)[0]
         terminations = {f"RL_{agent_type}": False}
