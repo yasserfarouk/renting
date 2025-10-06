@@ -142,7 +142,9 @@ class Args:
     learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
     # num_envs: int = 30
-    num_envs: int = int(0.8 * cpu_count())
+    num_envs: int = 0
+    cpus: float = 0.8
+
     """the number of parallel game environments"""
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
@@ -194,6 +196,10 @@ class Args:
 
         # if self.exp in ("anac2024",):
         #     self.num_envs = int(0.6 * cpu_count())
+        if self.num_envs < 1:
+            self.num_envs = int(self.cpus * cpu_count())
+            if self.verbose:
+                print(f"Will use {self.num_envs} envs")
 
         if self.opponent_types is None:
             self.opponent_types, self.opponent_map = find_opponents(True, self.exp)
