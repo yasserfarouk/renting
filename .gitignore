@@ -18,7 +18,5 @@ models/*
 !GNN
 !HigaEtAl
 analysis
-vendor/*
-vendor
 
 *.sbatch

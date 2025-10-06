@@ -281,7 +281,7 @@ class NegotiationEnvZoo(ParallelEnv):
                 elif self.scenario.src_path and Path(self.scenario.src_path).is_dir():
                     negpath = Path(self.scenario.src_path)
                 if negpath:
-                    neg = NegmasScenario.load(negpath)
+                    neg = NegmasScenario.load(negpath, ignore_discount=True)
             if neg is not None:
                 stats_ = neg.calc_stats()
                 dists = calc_outcome_distances(

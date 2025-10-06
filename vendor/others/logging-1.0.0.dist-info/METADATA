@@ -1,0 +1,11 @@
+Metadata-Version: 2.2
+Name: logging
+Version: 1.0.0
+Summary: basic logging
+Home-page: https://tracinsy.ewi.tudelft.nl/pubtrac/Utilities/
+Author: W.Pasman
+Classifier: Programming Language :: Python :: 3
+Dynamic: author
+Dynamic: classifier
+Dynamic: home-page
+Dynamic: summary

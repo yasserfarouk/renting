@@ -48,7 +48,8 @@ class Policies(Enum):
 def find_opponents(training: bool, exp: str) -> tuple[tuple[str, ...], dict[str, Any]]:
     if exp in ("scml_dynamic",):
         opponent_types = (
-            ("ConcederAgent", "BoulwareAgent") if training else ("LinearAgent",)
+            # ("ConcederAgent", "BoulwareAgent") if training else ("LinearAgent",)
+            ("BoulwareAgent",) if training else ("LinearAgent",)
         )
     elif exp in (
         "anac",
@@ -65,12 +66,10 @@ def find_opponents(training: bool, exp: str) -> tuple[tuple[str, ...], dict[str,
     ):
         opponent_types = ("BoulwareAgent",) if training else ("BoulwareAgent",)
     elif exp in ("anac2024",):
-        opponent_types = (
-            ("BoulwareAgent", "ConcederAgent") if training else ("BoulwareAgent",)
-        )
+        opponent_types = ("BoulwareAgent",) if training else ("BoulwareAgent",)
     else:
         opponent_types = (
-            ("BoulwareAgent", "ConcederAgent") if training else ("BoulwareAgent",)
+            ("BoulwareAgent", "ConcederAgent") if training else ("LinearAgent",)
         )
 
     base_map = TRAINING_AGENTS if training else TESTING_AGENTS
@@ -187,6 +186,9 @@ class Args:
                 self.total_timesteps = 200_000
             else:
                 self.total_timesteps = 100_000
+
+        if self.exp in ("anac2024",):
+            self.num_envs = int(0.6 * cpu_count())
 
         if self.opponent_types is None:
             self.opponent_types, self.opponent_map = find_opponents(True, self.exp)
@@ -336,7 +338,7 @@ def main():
                     if scenario.negmas_scenario:
                         print(f"{scenario.negmas_scenario.outcome_space.name=}")
                         for u in scenario.negmas_scenario.ufuns:
-                            print(f"{type(u)}\t{u.weights=}\n\t{u.values=}")  # type: ignore
+                            print(f"\t{type(u)}\n\t{u.weights=}")  # type: ignore
                     else:
                         print("No negmas scenario loaded")
                 # scenario = Scenario.create_random([200, 1000], scenario_rng, 5, True)

@@ -1,0 +1,14 @@
+Metadata-Version: 2.2
+Name: pyson
+Version: 1.1.3
+Summary: annotation mechanism for json serialization
+Home-page: https://tracinsy.ewi.tudelft.nl/pubtrac/Utilities/packson
+Author: W.Pasman
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Requires-Dist: uri@ https://tracinsy.ewi.tudelft.nl/pubtrac/Utilities/export/297/uri/dist/uri-2.0.0.tar.gz
+Dynamic: author
+Dynamic: classifier
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: summary
