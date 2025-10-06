@@ -14,11 +14,11 @@ from tensordict import TensorDict
 
 from environment.agents.policy.PPO import GNN
 from environment.negotiation import NegotiationEnvZoo
-from ppo import Args, Policies, find_opponents
+from ppo import Args, Policies, find_opponents, MODELS_BASE, BASE
 from time import perf_counter
 
 
-SAVE_LOC = Path.home() / "negmas" / "external" / "renting"
+SAVE_LOC = BASE
 
 
 @dataclass
@@ -38,7 +38,7 @@ class ArgsEval(Args):
         super().__post_init__()
         self.opponent_types, self.opponent_map = find_opponents(False, self.exp)
         if self.method is not None:
-            base = Path("models")
+            base = MODELS_BASE
             if self.method:
                 paths = list(base.glob(f"{self.method}_*"))
                 if self.exp:

@@ -1,5 +1,6 @@
 from os import cpu_count
 import random
+from json import dump
 from typing import Any
 from tqdm import tqdm
 import time
@@ -30,6 +31,10 @@ from environment.agents.geniusweb import TRAINING_AGENTS, TESTING_AGENTS
 from environment.agents.policy.PPO import GNN, HigaEtAl
 from environment.negotiation import NegotiationEnvZoo
 from environment.scenario import ScenarioLoader
+
+
+BASE = Path.home() / "negmas" / "external" / "renting"
+MODELS_BASE = Path.home() / "negmas" / "external" / "models"
 
 MAP_DTYPE = {
     "int32": torch.int32,
@@ -251,7 +256,7 @@ def main():
     run_name = (
         f"{run_name_base}.{datetime.now().strftime('%y-%m-%d_%H:%M:%S')}_{uuid4()}"
     )
-    models = [_.name for _ in Path("models").glob(f"{run_name_base}.*")]
+    models = [_.name for _ in MODELS_BASE.glob(f"{run_name_base}.*")]
     if not args.retrain and any(_.startswith(run_name_base) for _ in models):
         print(f"Found existing model at {run_name}, will not retrain")
         return
@@ -329,6 +334,7 @@ def main():
     # TRY NOT TO MODIFY: start the game
     global_step = 0
     start_time = time.time()
+    model_path = None
 
     _strt = time.perf_counter()
     for iteration in tqdm(range(1, args.num_iterations + 1)):
@@ -535,20 +541,25 @@ def main():
                 {"SPS": int(global_step / (time.time() - start_time))}, global_step
             )
         # print("SPS:", int(global_step / (time.time() - start_time)))
-        model_path = f"models/{run_name}"
+        model_path = MODELS_BASE / run_name
         # print(f"Will save the model to {model_path}")
         torch.save(agent.state_dict(), model_path)
 
-    print(f"Model saved to to {model_path}")
-    envs.close()
     total_time = time.perf_counter() - _strt
+    print(f"Total time: {total_time:.3f} seconds")
+    if model_path:
+        print(f"Model saved to to {model_path}")
+    envs.close()
 
     if args.wandb:
         artifact = wandb.Artifact("model", type="model")  # type: ignore
         artifact.add_file(model_path)  # type: ignore
         logger.log_artifact(artifact)  # type: ignore
         logger.finish()  # type: ignore
-    print(f"Total time: {total_time:.3f} seconds")
+
+    if model_path:
+        with open(model_path.with_suffix(".json"), "w") as ff:
+            dump(dict(total_time=total_time) | vars(args), ff)
 
 
 if __name__ == "__main__":
