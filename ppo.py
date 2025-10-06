@@ -187,8 +187,8 @@ class Args:
             else:
                 self.total_timesteps = 100_000
 
-        if self.exp in ("anac2024",):
-            self.num_envs = int(0.6 * cpu_count())
+        # if self.exp in ("anac2024",):
+        #     self.num_envs = int(0.6 * cpu_count())
 
         if self.opponent_types is None:
             self.opponent_types, self.opponent_map = find_opponents(True, self.exp)

@@ -19,6 +19,7 @@ dependencies = [
     "supersuit==3.9.2",
     "tyro==0.7.2",
     "pandas==2.2.0",
+		"rfc3986",
 ]
 
 [project.optional-dependencies]
