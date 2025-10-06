@@ -55,8 +55,8 @@ class ArgsEval(Args):
 
 
 def evaluate_agent(opponent, model_path, args):
-    agent_type = model_path.split("/")[1].split("_")[0]
-    exp = "_".join(model_path.split("/")[1].split("_")[1:]).split(".")[0]
+    agent_type = model_path.split("/")[-1].split("_")[0]
+    exp = "_".join(model_path.split("/")[-1].split("_")[1:]).split(".")[0]
     print(f"Evaluating {agent_type} for {exp} against {opponent}")
     used_agents = [
         a for a in args.opponent_map if a.startswith(tuple(args.opponent_sets))
