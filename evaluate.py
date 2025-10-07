@@ -40,7 +40,11 @@ class ArgsEval(Args):
         if self.method is not None:
             base = MODELS_BASE
             if self.method:
-                paths = [_ for _ in base.glob(f"{self.method}_*") if _.is_file() and not _.name.endswith(".json")]
+                paths = [
+                    _
+                    for _ in base.glob(f"{self.method}_*")
+                    if _.is_file() and not _.name.endswith(".json")
+                ]
                 if self.exp:
                     paths = [p for p in paths if f"_{self.exp}." in p.name]
                 if paths:
@@ -234,6 +238,10 @@ def main():
         for result in results:
             data.loc[(i, result[1]), result[0].keys()] = list(result[0].values())
     data.to_csv(save_loc / "evaluation.csv")
+    try:
+        print(data[["my_utility", "rounds_playd"]])
+    except:
+        pass
     pd.DataFrame.from_records(details_).to_csv(save_loc / "details.csv", index=False)
     if args.debug:
         # metrics, details, opp = evaluate_agent(
