@@ -340,6 +340,7 @@ def main():
     global_step = 0
     start_time = time.time()
     model_path = None
+    size = 0
 
     _strt = time.perf_counter()
     for iteration in tqdm(range(1, args.num_iterations + 1)):
@@ -350,13 +351,13 @@ def main():
             if args.scenario.startswith("environment/scenarios/random_tmp"):
                 scenario = loader.next_scenario()
                 if args.verbose:
-                    print(f"Loading scenario {scenario.name} from {scenario.src_path}")
-                    if scenario.negmas_scenario:
-                        print(f"{scenario.negmas_scenario.outcome_space.name=}")
-                        for u in scenario.negmas_scenario.ufuns:
-                            print(f"\t{type(u)}\n\t{u.weights=}")  # type: ignore
-                    else:
-                        print("No negmas scenario loaded")
+                    print(f"Loading scenario {scenario.name} of size {scenario.size}")
+                    # if scenario.negmas_scenario:
+                    #     print(f"{scenario.negmas_scenario.outcome_space.name=}")
+                    #     for u in scenario.negmas_scenario.ufuns:
+                    #         print(f"\t{type(u)}\n\t{u.weights=}")  # type: ignore
+                    # else:
+                    #     print("No negmas scenario loaded")
                 # scenario = Scenario.create_random([200, 1000], scenario_rng, 5, True)
                 scenario.to_directory(Path(args.scenario))
 
@@ -548,7 +549,9 @@ def main():
         # print("SPS:", int(global_step / (time.time() - start_time)))
         model_path = MODELS_BASE / run_name
         # print(f"Will save the model to {model_path}")
+        model_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(agent.state_dict(), model_path)
+        size = sum(p.numel() for p in agent.parameters())
 
     total_time = time.perf_counter() - _strt
     print(f"Total time: {total_time:.3f} seconds")
@@ -564,7 +567,7 @@ def main():
 
     if model_path:
         with open(model_path.with_suffix(".json"), "w") as ff:
-            dump(dict(total_time=total_time) | vars(args), ff)
+            dump(dict(total_time=total_time, model_size=size), ff)
 
 
 if __name__ == "__main__":
