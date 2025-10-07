@@ -40,7 +40,7 @@ class ArgsEval(Args):
         if self.method is not None:
             base = MODELS_BASE
             if self.method:
-                paths = list(base.glob(f"{self.method}_*"))
+                paths = [_ for _ in base.glob(f"{self.method}_*") if _.is_file() and not _.name.endswith(".json")]
                 if self.exp:
                     paths = [p for p in paths if f"_{self.exp}." in p.name]
                 if paths:
