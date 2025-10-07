@@ -566,8 +566,20 @@ def main():
         logger.finish()  # type: ignore
 
     if model_path:
-        with open(model_path.with_suffix(".json"), "w") as ff:
-            dump(dict(total_time=total_time, model_size=size), ff)
+        with open(model_path.parent / f"{model_path.name}.json", "w") as ff:
+            dump(
+                dict(
+                    total_time=total_time,
+                    model_size=size,
+                    run_name=run_name,
+                    run_name_base=run_name_base,
+                    time=str(datetime.now()),
+                    machine=socket.gethostname(),
+                    exp=args.exp,
+                    model=args.policy.name,
+                ),
+                ff,
+            )
 
 
 if __name__ == "__main__":
