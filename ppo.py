@@ -1,5 +1,6 @@
 from os import cpu_count
 import random
+import socket
 from json import dump
 from typing import Any
 from tqdm import tqdm
@@ -259,9 +260,7 @@ def init_tensors(batch_size, envs, device) -> tuple[TensorDict, Tensor]:
 def main():
     args = tyro.cli(Args)
     run_name_base = f"{args.policy.name}_{args.exp}"
-    run_name = (
-        f"{run_name_base}.{datetime.now().strftime('%y-%m-%d_%H:%M:%S')}_{uuid4()}"
-    )
+    run_name = f"{run_name_base}.{datetime.now().strftime('%y-%m-%d_%H:%M:%S')}_{uuid4()}_{socket.gethostname()}"
     models = [_.name for _ in MODELS_BASE.glob(f"{run_name_base}.*")]
     if not args.retrain and any(_.startswith(run_name_base) for _ in models):
         print(f"Found existing model at {run_name}, will not retrain")
