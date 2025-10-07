@@ -321,7 +321,7 @@ def main():
         scenario = loader.random_scenario()
         if args.verbose:
             print(
-                f"Training on scenario {scenario.name} of size {scenario.size}. Will save in {run_name}",
+                f"Training on scenario [green]{scenario.name}[/green] of size {scenario.size}. Will save in {run_name}",
                 flush=True,
             )
         scenario.to_directory(Path(args.scenario))
