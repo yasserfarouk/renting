@@ -45,7 +45,7 @@ class ArgsEval(Args):
                     paths = [p for p in paths if f"_{self.exp}." in p.name]
                 if paths:
                     paths = sorted(paths, reverse=True)
-                print(f"Will use model {str(paths[0])}")
+                print(f"Will use model {str(paths[0])} of {len(paths)} models found")
                 if self.model_paths:
                     self.model_paths = tuple(
                         list(self.model_paths).append(str(paths[0]))
@@ -193,6 +193,7 @@ def evaluate_agent(opponent, model_path, args):
 
 
 def main():
+    metrics = {}
     args = tyro.cli(ArgsEval)
     used_agents = [
         a for a in args.opponent_map if a.startswith(tuple(args.opponent_sets))
@@ -202,50 +203,44 @@ def main():
         args.episodes = 5
         used_agents = used_agents[:1]
         args.model_paths = args.model_paths[:1]
-        # print(details)
-    # else:
-    if 1:
-        print("Saving ...")
-        iterables = [list(range(len(args.model_paths))), sorted(used_agents)]
-        index = pd.MultiIndex.from_product(iterables, names=["model", "opponent"])
-        data = pd.DataFrame(
-            columns=[  # type: ignore
-                "my_utility",
-                "opp_utility",
-                "rounds_played",
-                "self_accepted",
-                "found_agreement",
-            ],
-            index=index,
-        )
-        details_ = []
+    iterables = [list(range(len(args.model_paths))), sorted(used_agents)]
+    index = pd.MultiIndex.from_product(iterables, names=["model", "opponent"])
+    data = pd.DataFrame(
+        columns=[  # type: ignore
+            "my_utility",
+            "opp_utility",
+            "rounds_played",
+            "self_accepted",
+            "found_agreement",
+        ],
+        index=index,
+    )
+    details_ = []
 
-        save_loc = (
-            SAVE_LOC
-            / (args.exp if args.exp else "unknown")
-            / args.method
-            / unique_name("", sep="")
-        )
-        save_loc.mkdir(parents=True, exist_ok=True)
-        for i, model_path in enumerate(args.model_paths):
-            print(f"{i} of {len(args.model_paths)}: {model_path}")
-            results = []
-            for opponent in used_agents:
-                metrics, details, opp = evaluate_agent(opponent, model_path, args)
-                details_ += details
-                results.append((metrics, opp))
-            for result in results:
-                data.loc[(i, result[1]), result[0].keys()] = list(result[0].values())
-        data.to_csv(save_loc / "evaluation.csv")
-        pd.DataFrame.from_records(details_).to_csv(
-            save_loc / "details.csv", index=False
-        )
-        if args.debug:
-            # metrics, details, opp = evaluate_agent(
-            #     used_agents[0], args.model_paths[0], args
-            # )
-            print([_["scenario_src_path"] for _ in details])
-            print(metrics)
+    save_loc = (
+        SAVE_LOC
+        / (args.exp if args.exp else "unknown")
+        / args.method
+        / unique_name("", sep="")
+    )
+    save_loc.mkdir(parents=True, exist_ok=True)
+    for i, model_path in enumerate(args.model_paths):
+        # print(f"{i} of {len(args.model_paths)}: {model_path}")
+        results = []
+        for opponent in used_agents:
+            metrics, details, opp = evaluate_agent(opponent, model_path, args)
+            details_ += details
+            results.append((metrics, opp))
+        for result in results:
+            data.loc[(i, result[1]), result[0].keys()] = list(result[0].values())
+    data.to_csv(save_loc / "evaluation.csv")
+    pd.DataFrame.from_records(details_).to_csv(save_loc / "details.csv", index=False)
+    if args.debug:
+        # metrics, details, opp = evaluate_agent(
+        #     used_agents[0], args.model_paths[0], args
+        # )
+        # print([_["scenario_src_path"] for _ in details])
+        print(metrics)
 
 
 if __name__ == "__main__":
