@@ -27,6 +27,7 @@ class ArgsEval(Args):
     exp: str = ""
     model_paths: tuple[str, ...] | None = None
     episodes: int = 50
+    latest_model: bool = False
 
     # extension parameters
     issue_size: int = 0
@@ -49,13 +50,19 @@ class ArgsEval(Args):
                     paths = [p for p in paths if f"_{self.exp}." in p.name]
                 if paths:
                     paths = sorted(paths, reverse=True)
-                print(f"Will use model {str(paths[0])} of {len(paths)} models found")
+                    if self.latest_model:
+                        paths = [paths[0]]
+                        print(
+                            f"Will use model {str(paths[0])} of {len(paths)} models found"
+                        )
+                paths = [str(_) for _ in paths]
                 if self.model_paths:
-                    self.model_paths = tuple(
-                        list(self.model_paths).append(str(paths[0]))
-                    )
+                    self.model_paths = tuple(list(self.model_paths) + paths)
                 else:
-                    self.model_paths = (str(paths[0]),)
+                    self.model_paths = tuple(str(_) for _ in paths)
+        if not self.model_paths:
+            print(f"No models found for method {self.method}")
+            exit(1)
 
 
 def evaluate_agent(opponent, model_path, args):
@@ -89,6 +96,8 @@ def evaluate_agent(opponent, model_path, args):
     log_metrics = defaultdict(list)
     detailed_metrics = []
     _strt = perf_counter()
+    rtimes = []
+    neg_times = []
 
     for episode in track(range(1, args.episodes + 1)):
         if (
@@ -110,6 +119,7 @@ def evaluate_agent(opponent, model_path, args):
         terminations = {f"RL_{agent_type}": False}
         step = 0
 
+        neg_start = perf_counter()
         while not terminations[f"RL_{agent_type}"]:
             next_obs = {
                 k: torch.from_numpy(v[np.newaxis, ...])
@@ -128,8 +138,15 @@ def evaluate_agent(opponent, model_path, args):
             step += 1
 
         t_ = perf_counter() - _strt
+        t_neg = perf_counter() - neg_start
         total_steps = step
         step = 0
+        neg_times.append(t_neg)
+        try:
+            rtime = max(t_neg / args.time_limit, total_steps / args.deadline)
+            rtimes.append(rtime)
+        except:
+            rtime = None
         info = infos[f"RL_{agent_type}"]
         log_metrics["my_utility"].append(info["utility_all_agents"][f"RL_{agent_type}"])
         log_metrics["opp_utility"].append(info["utility_all_agents"][opponent])
@@ -158,11 +175,9 @@ def evaluate_agent(opponent, model_path, args):
         log_metrics["modified_ks_optimality"].append(
             info.get("modified_ks_optimality", float("nan"))
         )
+        log_metrics["relative_time"].append(rtime)
+        log_metrics["neg_time"].append(t_neg)
 
-        try:
-            rtime = max(t_ / args.time_limit, total_steps / args.deadline)
-        except:
-            rtime = None
         detailed_metrics.append(
             info
             | dict(
@@ -173,6 +188,7 @@ def evaluate_agent(opponent, model_path, args):
                 time=t_,
                 step=total_steps,
                 relative_time=rtime,
+                neg_time=t_neg,
                 pareto_optimality=info.get("pareto_optimality", float("nan")),
                 nash_optimality=info.get("nash_optimality", float("nan")),
                 kalai_optimality=info.get("kalai_optimality", float("nan")),
@@ -206,19 +222,9 @@ def main():
     if args.debug:
         args.episodes = 5
         used_agents = used_agents[:1]
-        args.model_paths = args.model_paths[:1]
+        # args.model_paths = args.model_paths[:1]
     iterables = [list(range(len(args.model_paths))), sorted(used_agents)]
-    index = pd.MultiIndex.from_product(iterables, names=["model", "opponent"])
-    data = pd.DataFrame(
-        columns=[  # type: ignore
-            "my_utility",
-            "opp_utility",
-            "rounds_played",
-            "self_accepted",
-            "found_agreement",
-        ],
-        index=index,
-    )
+    data = []
     details_ = []
 
     save_loc = (
@@ -228,27 +234,55 @@ def main():
         / unique_name("", sep="")
     )
     save_loc.mkdir(parents=True, exist_ok=True)
-    for i, model_path in enumerate(args.model_paths):
-        # print(f"{i} of {len(args.model_paths)}: {model_path}")
+    for i, model_path in enumerate(sorted(args.model_paths, reverse=True)):
+        if not args.latest_model:
+            print(f"Evaluating {i} of {len(args.model_paths)}: {model_path}")
         results = []
+        model_name = str(model_path).split("/")[-1]
+        info_ = dict()
+        parts = model_name.split("_")
+        info_["model_index"] = i
+        info_["model_type"] = parts[0]
+        parts = "_".join(parts[1:]).split(".")
+        info_["exp"] = parts[0]
+        info_["run_identifier"] = ".".join(parts[1:])
         for opponent in used_agents:
-            metrics, details, opp = evaluate_agent(opponent, model_path, args)
+            try:
+                metrics, details, opp = evaluate_agent(opponent, model_path, args)
+            except Exception as e:
+                print(
+                    f"Failed to evaluate {info_['model_type']} ({info_['run_identifier']}) against {opponent}: {e}"
+                )
+                continue
+            info_ |= dict(opponent=str(opponent))
+            details = [_ | info_ for _ in details]
+            metrics |= info_
             details_ += details
-            results.append((metrics, opp))
-        for result in results:
-            data.loc[(i, result[1]), result[0].keys()] = list(result[0].values())
-    data.to_csv(save_loc / "evaluation.csv")
-    try:
-        print(data[["my_utility", "rounds_playd"]])
-    except:
-        pass
+            data.append(metrics)
+
+    data_df = pd.DataFrame.from_records(data)
+    data_df.to_csv(save_loc / "evaluation.csv")
     pd.DataFrame.from_records(details_).to_csv(save_loc / "details.csv", index=False)
-    if args.debug:
-        # metrics, details, opp = evaluate_agent(
-        #     used_agents[0], args.model_paths[0], args
-        # )
-        # print([_["scenario_src_path"] for _ in details])
-        print(metrics)
+    print(
+        data_df.loc[
+            :,
+            [
+                "model_index",
+                "model_type",
+                "run_identifier",
+                "opponent",
+                "my_utility_mean",
+                "relative_time_mean",
+                "neg_time_mean",
+            ],
+        ]
+    )
+    # if args.debug:
+    #     # metrics, details, opp = evaluate_agent(
+    #     #     used_agents[0], args.model_paths[0], args
+    #     # )
+    #     # print([_["scenario_src_path"] for _ in details])
+    #     print(metrics)
 
 
 if __name__ == "__main__":
