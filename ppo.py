@@ -46,6 +46,24 @@ MAP_DTYPE = {
 }
 
 
+def _simple(x):
+    return isinstance(x, (int, float, str, tuple, list, dict, np.ndarray))
+
+
+def _simplify(x):
+    if isinstance(x, np.ndarray):
+        return x.tolist()
+    if isinstance(x, list):
+        return [_simplify(_) for _ in x]
+    if isinstance(x, tuple):
+        return tuple(_simplify(_) for _ in x)
+    if isinstance(x, dict):
+        return {k: _simplify(v) for k, v in x.items()}
+    if not _simple(x):
+        return str(x)
+    return x
+
+
 class Policies(Enum):
     GNN = GNN
     HigaEtAl = HigaEtAl
@@ -341,6 +359,7 @@ def main():
     start_time = time.time()
     model_path = None
     size = 0
+    args_dict = {k: _simplify(v) for k, v in vars(args).items() if _simple(v)}
 
     _strt = time.perf_counter()
     for iteration in tqdm(range(1, args.num_iterations + 1)):
@@ -457,6 +476,7 @@ def main():
         # Optimizing the policy and value network
         b_inds = np.arange(args.batch_size)
         clipfracs = []
+        run_info = dict()
         for epoch in range(args.update_epochs):
             np.random.shuffle(b_inds)
             for start in range(0, args.batch_size, args.minibatch_size):
@@ -552,34 +572,46 @@ def main():
         model_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(agent.state_dict(), model_path)
         size = sum(p.numel() for p in agent.parameters())
+        total_time = time.perf_counter() - _strt
+        args_dict = {k: _simplify(v) for k, v in vars(args).items() if _simple(v)}
+        run_info = args_dict | dict(
+            total_time=total_time,
+            model_size=size,
+            run_name=run_name,
+            run_name_base=run_name_base,
+            time=str(datetime.now()),
+            machine=socket.gethostname(),
+            exp=args.exp,
+            model=args.policy.name,
+        )
+        with open(model_path.parent / f"{model_path.name}.json", "w") as ff:
+            dump(run_info, ff)
 
     total_time = time.perf_counter() - _strt
     print(f"Total time: {total_time:.3f} seconds")
     if model_path:
         print(f"Model of size {size} saved to to {model_path}")
     envs.close()
+    if model_path:
+        args_dict = {k: _simplify(v) for k, v in vars(args).items() if _simple(v)}
+        run_info = args_dict | dict(
+            total_time=total_time,
+            model_size=size,
+            run_name=run_name,
+            run_name_base=run_name_base,
+            time=str(datetime.now()),
+            machine=socket.gethostname(),
+            exp=args.exp,
+            model=args.policy.name,
+        )
+        with open(model_path.parent / f"{model_path.name}_final.json", "w") as ff:
+            dump(run_info, ff)
 
     if args.wandb:
         artifact = wandb.Artifact("model", type="model")  # type: ignore
         artifact.add_file(model_path)  # type: ignore
         logger.log_artifact(artifact)  # type: ignore
         logger.finish()  # type: ignore
-
-    if model_path:
-        with open(model_path.parent / f"{model_path.name}.json", "w") as ff:
-            dump(
-                dict(
-                    total_time=total_time,
-                    model_size=size,
-                    run_name=run_name,
-                    run_name_base=run_name_base,
-                    time=str(datetime.now()),
-                    machine=socket.gethostname(),
-                    exp=args.exp,
-                    model=args.policy.name,
-                ),
-                ff,
-            )
 
 
 if __name__ == "__main__":
