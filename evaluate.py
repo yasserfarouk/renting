@@ -28,6 +28,8 @@ class ArgsEval(Args):
     model_paths: tuple[str, ...] | None = None
     episodes: int = 50
     latest_model: bool = False
+    select_model: str = ""
+    metric: str = "my_utility_mean"
 
     # extension parameters
     issue_size: int = 0
@@ -261,6 +263,36 @@ def main():
             data.append(metrics)
 
     data_df = pd.DataFrame.from_records(data)
+    if args.select_model.lower() == "best":
+        data_df = (
+            data_df.sort_values(by=args.metric, ascending=False)
+            .groupby(by=["model_type", "opponent"])
+            .head(1)
+            .reset_index()
+        )
+    elif args.select_model.lower() == "latest":
+        data_df = (
+            data_df.sort_values(by=["model_index"], ascending=False)
+            .groupby(by=["model_type", "opponent"])
+            .head(1)
+            .reset_index()
+        )
+    elif args.select_model.lower() == "all":
+        pass
+    elif args.select_model.lower() == "worst":
+        data_df = (
+            data_df.sort_values(by=args.metric, ascending=True)
+            .groupby(by=["model_type", "opponent"])
+            .head(1)
+            .reset_index()
+        )
+    elif args.select_model.lower() == "median":
+        data_df = (
+            data_df.sort_values(by=args.metric, ascending=False)
+            .groupby(by=["model_type", "opponent"])
+            .nth(len(data_df) // 2)
+            .reset_index()
+        )
     data_df.to_csv(save_loc / "evaluation.csv")
     pd.DataFrame.from_records(details_).to_csv(save_loc / "details.csv", index=False)
     print(
